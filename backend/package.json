@@ -1,0 +1,6 @@
+{
+  "name": "reservation-system-backend",
+  "version": "0.0.1",
+  "description": "Backend scaffold for the cafe reservation system",
+  "license": "MIT"
+}
