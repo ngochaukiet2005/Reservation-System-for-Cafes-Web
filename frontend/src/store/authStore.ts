@@ -6,7 +6,7 @@ export const authStore = reactive({
   isAuthenticated: false,
   isLoading: false,
 
-  // Giả lập Login (Giữ nguyên logic cũ)
+  // Giả lập Login
   async login(payload: { email: string; password: string }) {
     this.isLoading = true;
     return new Promise((resolve, reject) => {
@@ -28,13 +28,13 @@ export const authStore = reactive({
     });
   },
 
-  // THÊM: Giả lập Register
-  async register(payload: { name: string; email: string; password: string }) {
+  // THÊM: phone vào payload
+  async register(payload: { name: string; email: string; phone: string; password: string }) {
     this.isLoading = true;
     return new Promise((resolve) => {
       setTimeout(() => {
         this.isLoading = false;
-        // Đăng ký xong tự động login luôn cho khách hàng
+        console.log('Register Data:', payload); // Log ra để kiểm tra
         this.setUser(new Date().getTime(), payload.name, payload.email, 'CUSTOMER');
         resolve(true);
       }, 1000);
@@ -47,7 +47,6 @@ export const authStore = reactive({
     this.isAuthenticated = false;
   },
 
-  // Helper để set user
   setUser(id: number, name: string, email: string, role: any) {
     this.token = 'fake-jwt-token';
     this.user = { id, name, email, role };

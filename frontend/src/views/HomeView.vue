@@ -134,61 +134,36 @@
       </div>
     </footer>
 
-    <transition name="modal">
-      <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-        <div class="modal-container">
-          <button class="btn-close" @click="closeModal">✕</button>
-          <div class="modal-left">
-            <h3>Welcome Back</h3>
-            <p>Đăng nhập để nhận ưu đãi.</p>
-          </div>
-          <div class="modal-right">
-            <div class="auth-toggle">
-              <button :class="{ active: isLoginMode }" @click="isLoginMode = true">Đăng Nhập</button>
-              <button :class="{ active: !isLoginMode }" @click="isLoginMode = false">Đăng Ký</button>
-            </div>
-            <form @submit.prevent="handleSubmit" class="auth-form">
-              <div class="input-group">
-                <input v-if="!isLoginMode" v-model="form.name" type="text" placeholder="Tên hiển thị" required>
-                <input v-model="form.email" type="email" placeholder="Email" required>
-                <input v-model="form.password" type="password" placeholder="Mật khẩu" required>
-              </div>
-              <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
-              <button type="submit" class="btn-submit" :disabled="authStore.isLoading">
-                {{ authStore.isLoading ? 'Đang xử lý...' : (isLoginMode ? 'Đăng Nhập' : 'Tạo Tài Khoản') }}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </transition>
+    <AuthModal 
+      :isVisible="showModal" 
+      @close="showModal = false"
+      @success="handleLoginSuccess"
+    />
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { authStore } from '../store/authStore';
+import AuthModal from '../components/AuthModal.vue'; // Import component mới
 
 const router = useRouter();
 
 // UI States
 const isScrolled = ref(false);
 const showModal = ref(false);
-const isLoginMode = ref(true);
 const showUserMenu = ref(false);
-const errorMsg = ref('');
 const redirectAfterLogin = ref(false);
 
-const form = reactive({ name: '', email: '', password: '' });
-
+// Dữ liệu mẫu (giữ nguyên)
 const bestSellers = [
   { name: 'Salted Caramel Latte', desc: 'Sự hòa quyện giữa vị mặn nhẹ và ngọt ngào.', price: '65.000đ', img: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?ixlib=rb-4.0.3&w=600&q=80' },
   { name: 'Tropical Fruit Tea', desc: 'Trà trái cây nhiệt đới tươi mát.', price: '55.000đ', img: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=600&q=80' },
   { name: 'Classic Tiramisu', desc: 'Bánh ngọt tráng miệng phong cách Ý.', price: '45.000đ', img: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=600&q=80' },
 ];
 
-const getFirstName = computed(() => authStore.user?.name.split(' ').pop() || 'Bạn');
 const getUserInitial = computed(() => authStore.user?.name.charAt(0).toUpperCase() || 'U');
 
 const scrollToSection = (sectionId: string) => {
@@ -200,32 +175,21 @@ const handleScroll = () => { isScrolled.value = window.scrollY > 50; };
 onMounted(() => window.addEventListener('scroll', handleScroll));
 onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 
+// Logic Modal mới
 const openAuthModal = (shouldRedirect: boolean) => {
   redirectAfterLogin.value = shouldRedirect;
   showModal.value = true;
-  errorMsg.value = '';
 };
-const closeModal = () => { showModal.value = false; errorMsg.value = ''; };
+
+const handleLoginSuccess = () => {
+  if (redirectAfterLogin.value) {
+    goToReservation();
+  }
+};
 
 const handleCTAClick = () => {
   if (authStore.isAuthenticated) goToReservation();
   else openAuthModal(true);
-};
-
-const handleSubmit = async () => {
-  errorMsg.value = '';
-  try {
-    if (isLoginMode.value) await authStore.login({ email: form.email, password: form.password });
-    else await authStore.register(form);
-    handlePostLogin();
-  } catch (err) {
-    errorMsg.value = 'Email hoặc mật khẩu không chính xác.';
-  }
-};
-
-const handlePostLogin = () => {
-  showModal.value = false;
-  if (redirectAfterLogin.value) goToReservation();
 };
 
 const toggleUserMenu = () => { showUserMenu.value = !showUserMenu.value; };
@@ -285,37 +249,29 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 .logo {
   display: flex;
   align-items: center;
-  gap: 15px; /* Khoảng cách giữa logo và chữ */
+  gap: 15px; 
   cursor: pointer;
 }
 
 .logo-img {
-  height: 90px; /* Logo to rõ */
+  height: 90px;
   width: auto;
   display: block;
   transition: all 0.3s ease;
-  /* Mặc định ở đầu trang: biến logo màu nâu thành trắng */
   filter: brightness(0) invert(1);
 }
 
 .logo-text {
   font-size: 1.8rem;
   font-weight: 700;
-  color: #ffffff; /* Mặc định chữ trắng */
+  color: #ffffff;
   letter-spacing: 1px;
   transition: color 0.3s ease;
   white-space: nowrap;
 }
 
-/* KHI CUỘN TRANG: Đổi màu logo và chữ về màu gốc (Nâu/Đen) */
-.navbar.scrolled .logo-img {
-  height: 70px; /* Thu nhỏ logo khi cuộn */
-  filter: none; /* Trả lại màu gốc cho logo */
-}
-
-.navbar.scrolled .logo-text {
-  color: var(--dark); /* Đổi màu chữ sang đen */
-}
+.navbar.scrolled .logo-img { height: 70px; filter: none; }
+.navbar.scrolled .logo-text { color: var(--dark); }
 
 /* BUTTONS */
 .btn-login {
@@ -336,7 +292,6 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 .hero-overlay { 
   position: absolute; 
   inset: 0; 
-  /* Gradient tối bên trái để nổi chữ, trong suốt bên phải để thấy ảnh */
   background: linear-gradient(90deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 50%, transparent 100%); 
 }
 .hero-content { position: relative; z-index: 2; max-width: 700px; animation: fadeUp 1s ease-out; }
@@ -364,15 +319,14 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 }
 .btn-cta:hover { transform: translateX(10px); background: #d35400; }
 
-/* --- CONTENT WRAPPER & BACKGROUND (NEW) --- */
+/* CONTENT WRAPPER */
 .content-wrapper {
   position: relative;
-  background: #fdfbf7; /* Nền kem chủ đạo */
-  overflow: hidden;    /* Cắt bỏ phần loang thừa */
+  background: #fdfbf7;
+  overflow: hidden;
   padding-bottom: 50px;
 }
 
-/* Các section con phải trong suốt */
 .about-section, .menu-section {
   background: transparent !important;
   position: relative;
@@ -389,27 +343,9 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
   z-index: 1;
   pointer-events: none;
 }
-
-/* Blob 1: Góc trên trái (About) */
-.blob-top-left {
-  width: 600px; height: 600px;
-  background: #ffe8cc;
-  top: -100px; left: -200px;
-}
-
-/* Blob 2: Góc giữa phải (Giao thoa) */
-.blob-center-right {
-  width: 500px; height: 500px;
-  background: #e3f2fd;
-  top: 35%; right: -150px;
-}
-
-/* Blob 3: Góc dưới trái (Menu) */
-.blob-bottom-left {
-  width: 700px; height: 700px;
-  background: #fae3d9;
-  bottom: -200px; left: -150px;
-}
+.blob-top-left { width: 600px; height: 600px; background: #ffe8cc; top: -100px; left: -200px; }
+.blob-center-right { width: 500px; height: 500px; background: #e3f2fd; top: 35%; right: -150px; }
+.blob-bottom-left { width: 700px; height: 700px; background: #fae3d9; bottom: -200px; left: -150px; }
 
 /* Layout Content */
 .split-layout { display: flex; gap: 80px; align-items: center; }
@@ -441,7 +377,7 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 .scroll-down { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; opacity: 1; animation: bounce 2s infinite; cursor: pointer; color: #ffffff; text-shadow: 0 2px 5px rgba(0,0,0,0.8); }
 .scroll-down span { display: block; font-size: 0.8rem; letter-spacing: 2px; margin-bottom: 5px; text-transform: uppercase; font-weight: 600; }
 
-/* MODAL & USER DROPDOWN (Giữ nguyên logic cũ) */
+/* USER DROPDOWN */
 .user-area-icon-only { cursor: pointer; position: relative; }
 .user-avatar-circle { width: 45px; height: 45px; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: grid; place-items: center; color: #fff; border: 1px solid rgba(255, 255, 255, 0.5); backdrop-filter: blur(5px); transition: 0.3s; position: relative; }
 .navbar.scrolled .user-avatar-circle { background: var(--dark); border-color: var(--dark); color: #fff; }
@@ -460,20 +396,8 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 .menu-item.logout { color: #e74c3c; margin-top: 5px; }
 .menu-item.logout:hover { background: #fff5f5; color: #c0392b; }
 .menu-divider { height: 1px; background: #eee; margin: 5px 20px; }
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-.modal-container { width: 800px; height: 500px; background: #fff; border-radius: 20px; display: flex; position: relative; overflow: hidden; }
-.btn-close { position: absolute; top: 15px; right: 20px; font-size: 1.5rem; background: none; border: none; cursor: pointer; color: #aaa; z-index: 10; }
-.modal-left { flex: 1; background: url('https://images.unsplash.com/photo-1511920170033-f8396924c348?ixlib=rb-4.0.3&w=600&q=80') center/cover; padding: 40px; display: flex; flex-direction: column; justify-content: flex-end; color: #fff; position: relative; }
-.modal-left::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); }
-.modal-left h3, .modal-left p { position: relative; z-index: 2; font-family: 'Montserrat', sans-serif;}
-.modal-right { flex: 1; padding: 50px; display: flex; flex-direction: column; justify-content: center; font-family: 'Montserrat', sans-serif; }
-.auth-toggle { display: flex; margin-bottom: 20px; background: #f2f2f2; padding: 5px; border-radius: 30px; }
-.auth-toggle button { flex: 1; padding: 10px; border: none; background: none; border-radius: 25px; font-weight: 600; color: #888; cursor: pointer; font-family: 'Montserrat', sans-serif;}
-.auth-toggle button.active { background: #fff; color: var(--dark); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-.input-group input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #eee; background: #fcfcfc; border-radius: 8px; box-sizing: border-box; font-family: 'Montserrat', sans-serif; }
-.btn-submit { width: 100%; padding: 12px; background: var(--dark); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: 'Montserrat', sans-serif; }
-.error-msg { color: #e74c3c; margin-bottom: 10px; text-align: center; font-size: 0.9rem; }
 
+/* ANIMATIONS */
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes bounce { 0%, 20%, 50%, 80%, 100% {transform: translateX(-50%) translateY(0);} 40% {transform: translateX(-50%) translateY(-10px);} 60% {transform: translateX(-50%) translateY(-5px);} }
