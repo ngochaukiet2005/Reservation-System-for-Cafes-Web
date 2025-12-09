@@ -2,7 +2,8 @@
   <div class="landing-page" @click="closeUserMenuOutside">
     <nav class="navbar" :class="{ scrolled: isScrolled }">
       <div class="logo">
-        <span class="brand-mark">C</span> <span class="brand-text">The Coffee House</span>
+        <img src="../assets/logo.png" alt="Trạm Sạc FC" class="logo-img">
+        <span class="logo-text">Trạm Sạc FC</span>
       </div>
 
       <div class="nav-actions">
@@ -13,7 +14,7 @@
         
         <div class="auth-section">
           <button v-if="!authStore.isAuthenticated" @click="openAuthModal(false)" class="btn-login">
-            <span class="icon">👤</span> Đăng Nhập
+            Đăng Nhập / Đăng Ký
           </button>
 
           <div v-else class="user-area-icon-only" @click.stop="toggleUserMenu">
@@ -40,9 +41,7 @@
                     <span class="menu-icon">✏️</span>
                     <span class="menu-text">Chỉnh sửa hồ sơ</span>
                   </div>
-                  
                   <div class="menu-divider"></div>
-
                   <div class="menu-item" @click="goToDashboard">
                     <span class="menu-icon">⚙️</span>
                     <span class="menu-text">Trang quản lý</span>
@@ -51,9 +50,7 @@
                     <span class="menu-icon">📜</span>
                     <span class="menu-text">Lịch sử đặt bàn</span>
                   </div>
-                  
                   <div class="menu-divider"></div>
-                  
                   <div class="menu-item logout" @click="handleLogout">
                     <span class="menu-icon">🚪</span>
                     <span class="menu-text">Đăng xuất</span>
@@ -85,49 +82,54 @@
       </div>
     </header>
 
-    <section id="about" class="section about-section">
-      <div class="container split-layout">
-        <div class="text-col">
-          <span class="tag">Về Chúng Tôi</span>
-          <h2>Hơn Cả Một Tách Cà Phê</h2>
-          <p class="desc-text">The Coffee House không chỉ là nơi phục vụ cà phê. Chúng tôi là điểm dừng chân của những tâm hồn yêu sự yên bình. Từng hạt cà phê được tuyển chọn từ vùng đất đỏ Bazan, rang xay mộc để giữ trọn hương vị nguyên bản.</p>
-        </div>
-        <div class="img-col">
-          <div class="img-wrapper">
-            <img src="https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&w=800&q=80" alt="Space">
+    <div class="content-wrapper">
+      
+      <div class="bg-blob blob-top-left"></div>
+      <div class="bg-blob blob-center-right"></div>
+      <div class="bg-blob blob-bottom-left"></div>
+
+      <section id="about" class="section about-section">
+        <div class="container split-layout">
+          <div class="text-col">
+            <h2>Hơn Cả Một Tách Cà Phê</h2>
+            <p class="desc-text">Trạm Sạc FC không chỉ là nơi phục vụ cà phê. Chúng tôi là điểm dừng chân của những tâm hồn yêu sự yên bình. Từng hạt cà phê được tuyển chọn từ vùng đất đỏ Bazan, rang xay mộc để giữ trọn hương vị nguyên bản.</p>
+          </div>
+          <div class="img-col">
+            <div class="img-wrapper">
+              <img src="https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&w=800&q=80" alt="Space">
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section id="menu" class="section menu-section">
-      <div class="container">
-        <div class="section-title">
-          <span class="sub-heading">Taste The Difference</span>
-          <h2>Signature Collections</h2>
-        </div>
-        <div class="cards-wrapper">
-          <div class="menu-card" v-for="(item, i) in bestSellers" :key="i">
-            <div class="card-image" :style="{ backgroundImage: `url(${item.img})` }"></div>
-            
-            <div class="card-content">
-              <div class="card-header">
-                <h3>{{ item.name }}</h3>
-                <p>{{ item.desc }}</p>
-              </div>
+      <section id="menu" class="section menu-section">
+        <div class="container">
+          <div class="section-title">
+            <h2>Signature Collections</h2>
+          </div>
+          <div class="cards-wrapper">
+            <div class="menu-card" v-for="(item, i) in bestSellers" :key="i">
+              <div class="card-image" :style="{ backgroundImage: `url(${item.img})` }"></div>
               
-              <div class="card-footer-price-only">
-                <span class="price">{{ item.price }}</span>
+              <div class="card-content">
+                <div class="card-header">
+                  <h3>{{ item.name }}</h3>
+                  <p>{{ item.desc }}</p>
+                </div>
+                
+                <div class="card-footer-price-only">
+                  <span class="price">{{ item.price }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
+    </div> 
     <footer class="footer">
       <div class="footer-content">
-        <h3>The Coffee House</h3>
+        <h3>Trạm Sạc FC</h3>
         <p>© 2025 All rights reserved.</p>
       </div>
     </footer>
@@ -181,7 +183,7 @@ const redirectAfterLogin = ref(false);
 const form = reactive({ name: '', email: '', password: '' });
 
 const bestSellers = [
-  { name: 'Salted Caramel Latte', desc: 'Sự hòa quyện giữa vị mặn nhẹ và ngọt ngào.', price: '65.000đ', img: 'https://images.unsplash.com/photo-1595928607828-5658f362a98c?auto=format&fit=crop&w=600&q=80' },
+  { name: 'Salted Caramel Latte', desc: 'Sự hòa quyện giữa vị mặn nhẹ và ngọt ngào.', price: '65.000đ', img: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?ixlib=rb-4.0.3&w=600&q=80' },
   { name: 'Tropical Fruit Tea', desc: 'Trà trái cây nhiệt đới tươi mát.', price: '55.000đ', img: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=600&q=80' },
   { name: 'Classic Tiramisu', desc: 'Bánh ngọt tráng miệng phong cách Ý.', price: '45.000đ', img: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=600&q=80' },
 ];
@@ -254,7 +256,7 @@ const goToDashboard = () => router.push('/staff/dashboard');
   background: var(--light);
 }
 
-h1, h2, h3, .brand-text, .price, .header-avatar { 
+h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text { 
   font-family: 'Cormorant Garamond', serif; 
 }
 
@@ -272,134 +274,86 @@ h1, h2, h3, .brand-text, .price, .header-avatar {
 /* Links Styling */
 .link-item { 
   text-decoration: none; 
-  color: #ffffff; /* Trắng tinh */
-  font-weight: 600; font-size: 0.95rem; letter-spacing: 0.5px;
+  color: #ffffff; 
+  font-weight: 700; font-size: 1.1rem; letter-spacing: 0.5px;
   transition: 0.3s; margin-right: 20px; cursor: pointer; text-transform: uppercase;
-}
-.user-name { 
-  color: #ffffff; font-weight: 600; 
-  text-shadow: 0 2px 10px rgba(0,0,0,0.8); 
 }
 .navbar.scrolled .link-item { color: var(--dark); }
 .link-item:hover { color: var(--primary); }
 
-.logo { 
-  display: flex; align-items: center; gap: 10px; 
-  font-weight: 600; font-size: 1.2rem; 
-  color: #ffffff; /* Trắng tinh */
+/* --- STYLE MỚI CHO LOGO (ẢNH + CHỮ) --- */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 15px; /* Khoảng cách giữa logo và chữ */
+  cursor: pointer;
 }
-.brand-mark { background: var(--primary); color: #fff; width: 35px; height: 35px; display: grid; place-items: center; border-radius: 50%; font-family: 'Cormorant Garamond'; font-size: 1.4rem; }
-.brand-text { font-size: 1.5rem; font-weight: 700; letter-spacing: 1px; }
-.navbar.scrolled .logo { color: var(--dark); }
 
+.logo-img {
+  height: 90px; /* Logo to rõ */
+  width: auto;
+  display: block;
+  transition: all 0.3s ease;
+  /* Mặc định ở đầu trang: biến logo màu nâu thành trắng */
+  filter: brightness(0) invert(1);
+}
+
+.logo-text {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #ffffff; /* Mặc định chữ trắng */
+  letter-spacing: 1px;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+/* KHI CUỘN TRANG: Đổi màu logo và chữ về màu gốc (Nâu/Đen) */
+.navbar.scrolled .logo-img {
+  height: 70px; /* Thu nhỏ logo khi cuộn */
+  filter: none; /* Trả lại màu gốc cho logo */
+}
+
+.navbar.scrolled .logo-text {
+  color: var(--dark); /* Đổi màu chữ sang đen */
+}
+
+/* BUTTONS */
 .btn-login {
-  padding: 8px 20px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.6);
+  padding: 12px 30px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.6);
   color: #fff; border-radius: 30px; cursor: pointer; backdrop-filter: blur(4px); transition: 0.3s;
-  display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.9rem;
+  display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 1.05rem;
 }
 .navbar.scrolled .btn-login { background: var(--dark); border-color: var(--dark); }
 .btn-login:hover { background: var(--primary); border-color: var(--primary); }
 
-/* USER AREA ICON */
-.user-area-icon-only { cursor: pointer; position: relative; }
-.user-avatar-circle {
-  width: 45px; height: 45px; background: rgba(255, 255, 255, 0.2); 
-  border-radius: 50%; display: grid; place-items: center; 
-  color: #fff; border: 1px solid rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(5px); transition: 0.3s; position: relative;
-}
-.navbar.scrolled .user-avatar-circle { background: var(--dark); border-color: var(--dark); color: #fff; }
-.user-avatar-circle:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
-.status-dot { position: absolute; bottom: 2px; right: 2px; width: 10px; height: 10px; background: #2ecc71; border-radius: 50%; border: 2px solid #fff; }
-
-/* === DROPDOWN MENU REDESIGNED === */
-.user-dropdown {
-  position: absolute; top: 60px; right: 0; width: 300px;
-  background: #fff; border-radius: 12px; 
-  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-  overflow: hidden; text-align: left; 
-  animation: slideUp 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
-  border: 1px solid rgba(0,0,0,0.05);
-}
-
-/* Header Bảng Chọn */
-.dropdown-header {
-  padding: 20px; background: #fdfbf7; border-bottom: 1px solid #eee;
-  display: flex; align-items: center; gap: 15px;
-}
-.header-avatar {
-  width: 48px; height: 48px; background: var(--primary); color: #fff;
-  border-radius: 50%; font-size: 1.5rem; display: grid; place-items: center;
-  font-weight: 700;
-}
-.header-info { display: flex; flex-direction: column; overflow: hidden; }
-.user-display-name { 
-  font-size: 1.1rem; color: var(--dark); font-weight: 700; 
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-  font-family: 'Cormorant Garamond', serif;
-}
-.user-email { color: #888; font-size: 0.85rem; margin-top: 2px; }
-
-/* Body Bảng Chọn */
-.dropdown-body { padding: 8px 0; }
-
-.menu-item {
-  display: flex; align-items: center; gap: 15px; 
-  padding: 12px 20px; cursor: pointer; transition: all 0.2s;
-  color: #555; font-size: 0.95rem; font-weight: 500;
-}
-.menu-item:hover { 
-  background: #fcfcfc; color: var(--primary); 
-  padding-left: 25px; /* Hiệu ứng trượt nhẹ */
-}
-.menu-icon { font-size: 1.1rem; width: 24px; text-align: center; }
-
-/* Logout Style */
-.menu-item.logout { color: #e74c3c; margin-top: 5px; }
-.menu-item.logout:hover { background: #fff5f5; color: #c0392b; }
-
-.menu-divider { height: 1px; background: #eee; margin: 5px 20px; }
-
-/* HERO SECTION - TYPOGRAPHY */
+/* HERO SECTION */
 .hero { 
   height: 100vh; position: relative; display: flex; align-items: center; padding-left: 10%; color: #fff;
   background-color: #2c2c2c; 
   background-image: url('../assets/banner.jpg'); 
   background-size: cover; background-position: center;
 }
-.hero-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 100%); }
+.hero-overlay { 
+  position: absolute; 
+  inset: 0; 
+  /* Gradient tối bên trái để nổi chữ, trong suốt bên phải để thấy ảnh */
+  background: linear-gradient(90deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 50%, transparent 100%); 
+}
 .hero-content { position: relative; z-index: 2; max-width: 700px; animation: fadeUp 1s ease-out; }
 
-.badge-new { 
-  display: inline-block; padding: 6px 16px; 
-  border: 1px solid rgba(255,255,255,0.5); border-radius: 20px; 
-  margin-bottom: 25px; font-size: 0.75rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 600;
-}
-
 .hero h1 { 
-  font-size: 4rem; line-height: 1.1; margin-bottom: 20px; 
-  color: #ffffff; /* Quan trọng: Màu trắng */
-  text-shadow: 0 4px 20px rgba(0,0,0,0.9); /* Bóng đen rất đậm để tách nền */
+  font-size: 4rem; line-height: 1.1; margin-bottom: 20px; color: #ffffff;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.9);
 }
-.hero-text-light { 
-  font-weight: 400; font-style: italic; 
-  opacity: 1; /* Sửa từ 0.9 thành 1 */
-  color: #ffffff; 
-}
+.hero-text-light { font-weight: 400; font-style: italic; opacity: 1; color: #ffffff; }
 .hero-text-bold.highlight { 
   font-weight: 700; font-size: 5rem; display: block; margin-top: 10px;
-  color: #ffe4c4; /* Màu kem sáng (Bisque) -> Rất nổi trên nền tối */
-  text-shadow: 0 4px 25px rgba(0,0,0,1); /* Bóng cực đậm */
+  color: #ffe4c4; text-shadow: 0 4px 25px rgba(0,0,0,1);
 }
-.hero-text-bold { font-weight: 700; font-size: 5rem; display: block; margin-top: 10px;}
-.highlight { color: var(--primary); }
-
 .hero p { 
-  font-size: 1.15rem; margin-bottom: 40px; 
-  color: #f0f0f0; /* Màu trắng khói */
-  opacity: 1; /* Bỏ làm mờ */
+  font-size: 1.15rem; margin-bottom: 40px; color: #f0f0f0; 
   line-height: 1.8; font-weight: 500; max-width: 550px;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.9); /* Bóng đậm */
+  text-shadow: 0 2px 10px rgba(0,0,0,0.9);
 }
 
 .btn-cta {
@@ -410,30 +364,65 @@ h1, h2, h3, .brand-text, .price, .header-avatar {
 }
 .btn-cta:hover { transform: translateX(10px); background: #d35400; }
 
-/* ABOUT SECTION */
+/* --- CONTENT WRAPPER & BACKGROUND (NEW) --- */
+.content-wrapper {
+  position: relative;
+  background: #fdfbf7; /* Nền kem chủ đạo */
+  overflow: hidden;    /* Cắt bỏ phần loang thừa */
+  padding-bottom: 50px;
+}
+
+/* Các section con phải trong suốt */
+.about-section, .menu-section {
+  background: transparent !important;
+  position: relative;
+  z-index: 2;
+}
 .section { padding: 120px 50px; }
+
+/* Blob Styles */
+.bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.6;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Blob 1: Góc trên trái (About) */
+.blob-top-left {
+  width: 600px; height: 600px;
+  background: #ffe8cc;
+  top: -100px; left: -200px;
+}
+
+/* Blob 2: Góc giữa phải (Giao thoa) */
+.blob-center-right {
+  width: 500px; height: 500px;
+  background: #e3f2fd;
+  top: 35%; right: -150px;
+}
+
+/* Blob 3: Góc dưới trái (Menu) */
+.blob-bottom-left {
+  width: 700px; height: 700px;
+  background: #fae3d9;
+  bottom: -200px; left: -150px;
+}
+
+/* Layout Content */
 .split-layout { display: flex; gap: 80px; align-items: center; }
 .text-col { flex: 1; }
-.tag { color: var(--primary); font-weight: 700; display: block; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px; font-size: 0.85rem; }
 .text-col h2 { font-size: 3.5rem; margin-bottom: 25px; line-height: 1.1; color: var(--dark); }
-.desc-text { 
-  font-size: 1.1rem; line-height: 1.8; color: #555; 
-  text-align: justify; font-weight: 400;
-}
+.desc-text { font-size: 1.1rem; line-height: 1.8; color: #555; text-align: justify; font-weight: 400; }
 .img-col { flex: 1; }
 .img-wrapper img { width: 100%; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); }
 
-/* MENU SECTION */
-.menu-section { background: #fff; }
+/* MENU CARDS */
 .section-title { text-align: center; margin-bottom: 60px; }
-.sub-heading { 
-  display: block; font-family: 'Montserrat', sans-serif; 
-  color: var(--primary); font-size: 0.9rem; font-weight: 600; 
-  letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px;
-}
 .section-title h2 { font-size: 3.5rem; color: var(--dark); margin: 0; }
-
-.cards-wrapper { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 40px; }
+.cards-wrapper { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 40px; justify-content: center; }
 .menu-card { 
   background: #fff; border-radius: 20px; overflow: hidden; 
   box-shadow: 0 10px 30px rgba(0,0,0,0.05); transition: 0.4s;
@@ -444,17 +433,33 @@ h1, h2, h3, .brand-text, .price, .header-avatar {
 .card-content { padding: 30px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
 .card-header h3 { font-size: 1.8rem; margin-bottom: 10px; color: var(--dark); font-weight: 700; }
 .card-header p { color: #666; font-size: 1rem; margin-bottom: 20px; line-height: 1.6; font-weight: 400; }
-
-.card-footer-price-only { 
-  display: flex; justify-content: center; 
-  margin-top: 20px; padding-top: 20px; border-top: 1px solid #f0f0f0; 
-}
+.card-footer-price-only { display: flex; justify-content: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #f0f0f0; }
 .price { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
 
-/* FOOTER & MODAL */
+/* FOOTER */
 .footer { background: var(--dark); color: #888; padding: 50px; text-align: center; font-family: 'Montserrat', sans-serif; }
-.scroll-down { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; opacity: 0.8; animation: bounce 2s infinite; cursor: pointer; }
-.scroll-down span { display: block; font-size: 0.8rem; letter-spacing: 2px; margin-bottom: 5px; text-transform: uppercase; font-family: 'Montserrat', sans-serif; font-weight: 600; }
+.scroll-down { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; opacity: 1; animation: bounce 2s infinite; cursor: pointer; color: #ffffff; text-shadow: 0 2px 5px rgba(0,0,0,0.8); }
+.scroll-down span { display: block; font-size: 0.8rem; letter-spacing: 2px; margin-bottom: 5px; text-transform: uppercase; font-weight: 600; }
+
+/* MODAL & USER DROPDOWN (Giữ nguyên logic cũ) */
+.user-area-icon-only { cursor: pointer; position: relative; }
+.user-avatar-circle { width: 45px; height: 45px; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: grid; place-items: center; color: #fff; border: 1px solid rgba(255, 255, 255, 0.5); backdrop-filter: blur(5px); transition: 0.3s; position: relative; }
+.navbar.scrolled .user-avatar-circle { background: var(--dark); border-color: var(--dark); color: #fff; }
+.user-avatar-circle:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
+.status-dot { position: absolute; bottom: 2px; right: 2px; width: 10px; height: 10px; background: #2ecc71; border-radius: 50%; border: 2px solid #fff; }
+.user-dropdown { position: absolute; top: 60px; right: 0; width: 300px; background: #fff; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); overflow: hidden; text-align: left; animation: slideUp 0.3s cubic-bezier(0.165, 0.84, 0.44, 1); border: 1px solid rgba(0,0,0,0.05); }
+.dropdown-header { padding: 20px; background: #fdfbf7; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 15px; }
+.header-avatar { width: 48px; height: 48px; background: var(--primary); color: #fff; border-radius: 50%; font-size: 1.5rem; display: grid; place-items: center; font-weight: 700; }
+.header-info { display: flex; flex-direction: column; overflow: hidden; }
+.user-display-name { font-size: 1.1rem; color: var(--dark); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Cormorant Garamond', serif; }
+.user-email { color: #888; font-size: 0.85rem; margin-top: 2px; }
+.dropdown-body { padding: 8px 0; }
+.menu-item { display: flex; align-items: center; gap: 15px; padding: 12px 20px; cursor: pointer; transition: all 0.2s; color: #555; font-size: 0.95rem; font-weight: 500; }
+.menu-item:hover { background: #fcfcfc; color: var(--primary); padding-left: 25px; }
+.menu-icon { font-size: 1.1rem; width: 24px; text-align: center; }
+.menu-item.logout { color: #e74c3c; margin-top: 5px; }
+.menu-item.logout:hover { background: #fff5f5; color: #c0392b; }
+.menu-divider { height: 1px; background: #eee; margin: 5px 20px; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
 .modal-container { width: 800px; height: 500px; background: #fff; border-radius: 20px; display: flex; position: relative; overflow: hidden; }
 .btn-close { position: absolute; top: 15px; right: 20px; font-size: 1.5rem; background: none; border: none; cursor: pointer; color: #aaa; z-index: 10; }
