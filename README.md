@@ -1,104 +1,83 @@
-# ☕ Reservation System for Cafés  
-### Hệ thống đặt bàn thông minh cho quán cà phê – Web Application
+# Hệ thống Quản lý Đặt bàn Quán Cà phê (Reservation System for Cafes)
 
----
+## Tổng quan Dự án
+Đây là ứng dụng web nhằm hỗ trợ quản lý quy trình đặt bàn tại quán cà phê, giúp tối ưu hóa việc sắp xếp chỗ ngồi cho khách hàng và quản lý lịch làm việc cho nhân viên. Hệ thống cung cấp giải pháp toàn diện kết nối giữa Khách hàng, Nhân viên phục vụ và Quản trị viên.
 
-## 📝 Giới thiệu
+Dự án được xây dựng theo kiến trúc RESTful API với Backend xử lý logic và Frontend hiển thị giao diện người dùng (SPA).
 
-**Reservation System for Cafés** là một hệ thống web giúp khách hàng đặt bàn trực tuyến, nhân viên xử lý yêu cầu đặt bàn, và quản trị viên quản lý toàn bộ hoạt động trong quán.  
-Hệ thống được xây dựng theo mô hình **REST API Backend + SPA Frontend**, sử dụng **NestJS, PostgreSQL, Vue 3** và hoàn toàn có khả năng triển khai thực tế.
+## Công nghệ Sử dụng
 
----
+### Frontend (Giao diện)
+- Vue 3 (Composition API): Xây dựng giao diện người dùng.
+- TypeScript: Đảm bảo kiểu dữ liệu chặt chẽ.
+- Vite: Công cụ build và môi trường phát triển siêu tốc.
+- Pinia: Quản lý trạng thái (State Management).
+- Vue Router: Quản lý điều hướng trang.
+- CSS/SCSS: Tùy chỉnh giao diện và hiệu ứng.
 
-## 🚀 Tính năng chính
+### Backend (Máy chủ)
+- NestJS: Framework Node.js xây dựng API.
+- TypeScript: Ngôn ngữ chính.
+- PostgreSQL: Hệ quản trị cơ sở dữ liệu quan hệ.
+- TypeORM: Tương tác với cơ sở dữ liệu.
+- JWT (JSON Web Token): Xác thực và phân quyền người dùng.
 
-### 👤 Khách hàng (Customer)
-- Tạo yêu cầu đặt bàn (chọn bàn, số lượng khách, thời gian)
-- Theo dõi trạng thái đặt bàn: `PENDING`, `CONFIRMED`, `CANCELED`
-- Xem lịch sử đặt bàn
+### Hạ tầng & Công cụ khác
+- Docker & Docker Compose: Đóng gói môi trường triển khai.
+- Git: Quản lý phiên bản mã nguồn.
 
-### 👨‍🍳 Nhân viên (Staff)
-- Xem danh sách yêu cầu đặt bàn đang chờ duyệt
-- Xác nhận hoặc từ chối yêu cầu
-- Quản lý trạng thái bàn theo ca
+## Các Tính năng Chính
 
-### 🛠 Quản trị viên (Admin)
-- Quản lý bàn: thêm, sửa, xóa, khóa/mở bàn
-- Quản lý tài khoản nhân viên
-- Xem thống kê tổng quan
-- Theo dõi lịch sử thao tác (Reservation Logs)
+### 1. Dành cho Khách hàng (Customer)
+- Đăng ký và Đăng nhập tài khoản (bao gồm quên mật khẩu, đổi mật khẩu).
+- Quản lý hồ sơ cá nhân (cập nhật thông tin, ảnh đại diện, giới tính).
+- Xem thực đơn và thông tin quán.
+- Đặt bàn trực tuyến (chọn thời gian, số lượng người, vị trí bàn).
+- Xem lịch sử đặt bàn.
 
----
+### 2. Dành cho Nhân viên (Staff)
+- Dashboard làm việc cho nhân viên.
+- Tiếp nhận và xử lý yêu cầu đặt bàn (Duyệt/Từ chối).
+- Hỗ trợ Check-in/Check-out cho khách hàng tại quán.
+- Kiểm tra trạng thái bàn (Trống/Đang có khách).
 
-## 🔧 Backend – NestJS
+### 3. Dành cho Quản trị viên (Admin)
+- Quản lý toàn bộ hệ thống.
+- Quản lý danh sách bàn (Thêm/Sửa/Xóa bàn, thiết lập khu vực).
+- Quản lý tài khoản nhân viên.
+- Xem báo cáo thống kê hoạt động.
 
-- **Ngôn ngữ:** TypeScript  
-- **Database:** PostgreSQL  
-- **ORM:** TypeORM  
-- **Auth:** JWT  
-- **Cấu trúc module-based MVC**
+## Hướng dẫn Cài đặt và Chạy Dự án
 
-Các module chính:
+### Yêu cầu hệ thống
+- Node.js (phiên bản 18 trở lên)
+- PostgreSQL (hoặc Docker để chạy container Database)
+- npm hoặc yarn
 
-- `auth` – đăng nhập / xác thực / phân quyền  
-- `users` – quản lý tài khoản (Admin, Staff, Customer)  
-- `tables` – quản lý danh sách bàn  
-- `reservations` – xử lý quy trình đặt bàn  
-- `reservation-logs` – lưu lịch sử thao tác  
+### Khởi chạy Backend
+1. Di chuyển vào thư mục backend:
+   cd backend
+2. Cài đặt các gói phụ thuộc:
+   npm install
+3. Cấu hình biến môi trường:
+   Sao chép file .env.example thành .env và cập nhật thông tin Database.
+4. Chạy server ở chế độ phát triển:
+   npm run start:dev
 
----
+### Khởi chạy Frontend
+1. Di chuyển vào thư mục frontend:
+   cd frontend
+2. Cài đặt các gói phụ thuộc:
+   npm install
+3. Chạy ứng dụng ở chế độ phát triển:
+   npm run dev
 
-## 🎨 Frontend – Vue 3 (Vite)
+## Cấu trúc Thư mục
+- backend/: Chứa mã nguồn API NestJS.
+- frontend/: Chứa mã nguồn giao diện VueJS.
+- docs/: Chứa tài liệu phân tích thiết kế và nghiệp vụ.
 
-- **Framework:** Vue 3 Composition API  
-- **Routing:** Vue Router  
-- **State Management:** Pinia  
-- **UI tách theo vai trò:**  
-  - Customer UI  
-  - Staff UI  
-  - Admin UI  
-
----
-
-## 🗄 Database – PostgreSQL
-
-Hỗ trợ chạy theo 2 cách:
-
-1. PostgreSQL cài trực tiếp trên máy  
-2. **Docker Compose (khuyên dùng để cả nhóm đồng nhất)**  
-
-Bảng chính:
-
-- `users`
-- `tables`
-- `reservations`
-- `reservation_logs`
-
----
-
-## 📦 Công nghệ sử dụng
-
-| Thành phần | Công nghệ |
-|-----------|-----------|
-| Backend | NestJS, TypeScript, TypeORM, PostgreSQL, JWT |
-| Frontend | Vue 3, Vite, Pinia, Axios |
-| DevOps | Docker Compose |
-| Kiến trúc | REST API + SPA |
-
----
-
-## 📚 Tài liệu đi kèm
-
-- `docs/RUN_GUIDE.md` – Hướng dẫn chạy dự án  
-- `docs/TEAM_TASKS.md` – Phân công công việc nhóm  
-- `docs/API_REFERENCE.md` – Tài liệu API đầy đủ  
-- `docs/SRS.md` – Đặc tả yêu cầu phần mềm (SRS)
-
----
-
-## ▶ Cách chạy dự án
-
-### 1️⃣ Chạy Database bằng Docker (khuyến nghị)
-
-```bash
-docker compose up -d
+## Trạng thái Phát triển
+Hiện tại dự án đang trong giai đoạn phát triển Frontend và tích hợp các API cơ bản.
+- Đã hoàn thiện: UI Trang chủ, Xác thực (Popup Đăng nhập/Đăng ký/Quên mật khẩu/Đổi mật khẩu/Sửa hồ sơ).
+- Đang phát triển: Logic đặt bàn và kết nối Backend.
