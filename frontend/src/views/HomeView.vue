@@ -18,18 +18,23 @@
           </button>
 
           <div v-else class="user-area-icon-only" @click.stop="toggleUserMenu">
-            <div class="user-avatar-circle">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
+            
+            <div v-if="authStore.user?.avatar" class="user-avatar-circle has-img">
+              <img :src="authStore.user.avatar" alt="Avatar">
+              <span class="status-dot"></span>
+            </div>
+
+            <div v-else class="user-avatar-circle">
+              {{ getUserInitial }}
               <span class="status-dot"></span>
             </div>
             
             <transition name="fade-slide">
               <div v-if="showUserMenu" class="user-dropdown">
                 <div class="dropdown-header">
-                  <div class="header-avatar">{{ getUserInitial }}</div>
+                  <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" class="header-avatar-img">
+                  <div v-else class="header-avatar">{{ getUserInitial }}</div>
+                  
                   <div class="header-info">
                     <span class="user-display-name">{{ authStore.user?.name }}</span>
                     <span class="user-email">{{ authStore.user?.email }}</span>
@@ -87,7 +92,6 @@
     </header>
 
     <div class="content-wrapper">
-      
       <div class="bg-blob blob-top-left"></div>
       <div class="bg-blob blob-center-right"></div>
       <div class="bg-blob blob-bottom-left"></div>
@@ -129,8 +133,8 @@
           </div>
         </div>
       </section>
-
     </div> 
+
     <footer class="footer">
       <div class="footer-content">
         <h3>Trạm Sạc FC</h3>
@@ -147,6 +151,10 @@
       :isVisible="showChangePassModal" 
       @close="showChangePassModal = false"
     />
+    <EditProfileModal 
+      :isVisible="showEditProfileModal" 
+      @close="showEditProfileModal = false"
+    />
   </div>
 </template>
 
@@ -154,8 +162,9 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { authStore } from '../store/authStore';
-import AuthModal from '../components/AuthModal.vue'; // Import component mới
+import AuthModal from '../components/AuthModal.vue';
 import ChangePasswordModal from '../components/ChangePasswordModal.vue';
+import EditProfileModal from '../components/EditProfileModal.vue';
 
 const router = useRouter();
 
@@ -164,9 +173,10 @@ const isScrolled = ref(false);
 const showModal = ref(false);
 const showUserMenu = ref(false);
 const redirectAfterLogin = ref(false);
-const showAuthModal = ref(false);
 const showChangePassModal = ref(false);
-// Dữ liệu mẫu (giữ nguyên)
+const showEditProfileModal = ref(false);
+
+// Dữ liệu mẫu
 const bestSellers = [
   { name: 'Salted Caramel Latte', desc: 'Sự hòa quyện giữa vị mặn nhẹ và ngọt ngào.', price: '65.000đ', img: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?ixlib=rb-4.0.3&w=600&q=80' },
   { name: 'Tropical Fruit Tea', desc: 'Trà trái cây nhiệt đới tươi mát.', price: '55.000đ', img: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=600&q=80' },
@@ -184,14 +194,12 @@ const handleScroll = () => { isScrolled.value = window.scrollY > 50; };
 onMounted(() => window.addEventListener('scroll', handleScroll));
 onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 
-// --- [THÊM MỚI] HÀM MỞ MODAL ---
+// Logic Mở Modal
 const openChangePassword = () => {
-  showUserMenu.value = false; // Đóng menu dropdown
-  showChangePassModal.value = true; // Mở modal popup
+  showUserMenu.value = false;
+  showChangePassModal.value = true;
 };
-// ------------------------------
 
-// Logic Modal mới
 const openAuthModal = (shouldRedirect: boolean) => {
   redirectAfterLogin.value = shouldRedirect;
   showModal.value = true;
@@ -210,13 +218,18 @@ const handleCTAClick = () => {
 
 const toggleUserMenu = () => { showUserMenu.value = !showUserMenu.value; };
 const closeUserMenuOutside = () => { showUserMenu.value = false; };
+
 const handleLogout = () => {
   authStore.logout();
   showUserMenu.value = false;
   router.push('/');
 };
 
-const handleEditProfile = () => { alert('Đang phát triển!'); showUserMenu.value = false; };
+const handleEditProfile = () => { 
+  showUserMenu.value = false;
+  showEditProfileModal.value = true; 
+};
+
 const goToReservation = () => router.push('/reservation');
 const goToHistory = () => router.push('/history');
 const goToDashboard = () => router.push('/staff/dashboard');
@@ -236,7 +249,7 @@ const goToDashboard = () => router.push('/staff/dashboard');
   background: var(--light);
 }
 
-h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text { 
+h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text, .user-display-name { 
   font-family: 'Cormorant Garamond', serif; 
 }
 
@@ -261,31 +274,10 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 .navbar.scrolled .link-item { color: var(--dark); }
 .link-item:hover { color: var(--primary); }
 
-/* --- STYLE MỚI CHO LOGO (ẢNH + CHỮ) --- */
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 15px; 
-  cursor: pointer;
-}
-
-.logo-img {
-  height: 90px;
-  width: auto;
-  display: block;
-  transition: all 0.3s ease;
-  filter: brightness(0) invert(1);
-}
-
-.logo-text {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 1px;
-  transition: color 0.3s ease;
-  white-space: nowrap;
-}
-
+/* LOGO */
+.logo { display: flex; align-items: center; gap: 15px; cursor: pointer; }
+.logo-img { height: 90px; width: auto; display: block; transition: all 0.3s ease; filter: brightness(0) invert(1); }
+.logo-text { font-size: 1.8rem; font-weight: 700; color: #ffffff; letter-spacing: 1px; transition: color 0.3s ease; white-space: nowrap; }
 .navbar.scrolled .logo-img { height: 70px; filter: none; }
 .navbar.scrolled .logo-text { color: var(--dark); }
 
@@ -305,27 +297,12 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
   background-image: url('../assets/banner.jpg'); 
   background-size: cover; background-position: center;
 }
-.hero-overlay { 
-  position: absolute; 
-  inset: 0; 
-  background: linear-gradient(90deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 50%, transparent 100%); 
-}
+.hero-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 50%, transparent 100%); }
 .hero-content { position: relative; z-index: 2; max-width: 700px; animation: fadeUp 1s ease-out; }
-
-.hero h1 { 
-  font-size: 4rem; line-height: 1.1; margin-bottom: 20px; color: #ffffff;
-  text-shadow: 0 4px 20px rgba(0,0,0,0.9);
-}
+.hero h1 { font-size: 4rem; line-height: 1.1; margin-bottom: 20px; color: #ffffff; text-shadow: 0 4px 20px rgba(0,0,0,0.9); }
 .hero-text-light { font-weight: 400; font-style: italic; opacity: 1; color: #ffffff; }
-.hero-text-bold.highlight { 
-  font-weight: 700; font-size: 5rem; display: block; margin-top: 10px;
-  color: #ffe4c4; text-shadow: 0 4px 25px rgba(0,0,0,1);
-}
-.hero p { 
-  font-size: 1.15rem; margin-bottom: 40px; color: #f0f0f0; 
-  line-height: 1.8; font-weight: 500; max-width: 550px;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.9);
-}
+.hero-text-bold.highlight { font-weight: 700; font-size: 5rem; display: block; margin-top: 10px; color: #ffe4c4; text-shadow: 0 4px 25px rgba(0,0,0,1); }
+.hero p { font-size: 1.15rem; margin-bottom: 40px; color: #f0f0f0; line-height: 1.8; font-weight: 500; max-width: 550px; text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
 
 .btn-cta {
   display: inline-flex; align-items: center; padding: 15px 45px;
@@ -335,30 +312,13 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 }
 .btn-cta:hover { transform: translateX(10px); background: #d35400; }
 
-/* CONTENT WRAPPER */
-.content-wrapper {
-  position: relative;
-  background: #fdfbf7;
-  overflow: hidden;
-  padding-bottom: 50px;
-}
-
-.about-section, .menu-section {
-  background: transparent !important;
-  position: relative;
-  z-index: 2;
-}
+/* CONTENT & SECTIONS */
+.content-wrapper { position: relative; background: #fdfbf7; overflow: hidden; padding-bottom: 50px; }
+.about-section, .menu-section { background: transparent !important; position: relative; z-index: 2; }
 .section { padding: 120px 50px; }
 
 /* Blob Styles */
-.bg-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.6;
-  z-index: 1;
-  pointer-events: none;
-}
+.bg-blob { position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.6; z-index: 1; pointer-events: none; }
 .blob-top-left { width: 600px; height: 600px; background: #ffe8cc; top: -100px; left: -200px; }
 .blob-center-right { width: 500px; height: 500px; background: #e3f2fd; top: 35%; right: -150px; }
 .blob-bottom-left { width: 700px; height: 700px; background: #fae3d9; bottom: -200px; left: -150px; }
@@ -375,11 +335,7 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 .section-title { text-align: center; margin-bottom: 60px; }
 .section-title h2 { font-size: 3.5rem; color: var(--dark); margin: 0; }
 .cards-wrapper { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 40px; justify-content: center; }
-.menu-card { 
-  background: #fff; border-radius: 20px; overflow: hidden; 
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05); transition: 0.4s;
-  display: flex; flex-direction: column;
-}
+.menu-card { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.05); transition: 0.4s; display: flex; flex-direction: column; }
 .menu-card:hover { transform: translateY(-10px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
 .card-image { height: 280px; background-size: cover; background-position: center; }
 .card-content { padding: 30px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
@@ -399,11 +355,17 @@ h1, h2, h3, .brand-text, .price, .header-avatar, .logo-text {
 .navbar.scrolled .user-avatar-circle { background: var(--dark); border-color: var(--dark); color: #fff; }
 .user-avatar-circle:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
 .status-dot { position: absolute; bottom: 2px; right: 2px; width: 10px; height: 10px; background: #2ecc71; border-radius: 50%; border: 2px solid #fff; }
+
+/* Avatar hình ảnh */
+.user-avatar-circle.has-img { padding: 0; overflow: hidden; border: 2px solid rgba(255,255,255,0.8); background: transparent; }
+.user-avatar-circle.has-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
 .user-dropdown { position: absolute; top: 60px; right: 0; width: 300px; background: #fff; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); overflow: hidden; text-align: left; animation: slideUp 0.3s cubic-bezier(0.165, 0.84, 0.44, 1); border: 1px solid rgba(0,0,0,0.05); }
 .dropdown-header { padding: 20px; background: #fdfbf7; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 15px; }
 .header-avatar { width: 48px; height: 48px; background: var(--primary); color: #fff; border-radius: 50%; font-size: 1.5rem; display: grid; place-items: center; font-weight: 700; }
+.header-avatar-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); }
 .header-info { display: flex; flex-direction: column; overflow: hidden; }
-.user-display-name { font-size: 1.1rem; color: var(--dark); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Cormorant Garamond', serif; }
+.user-display-name { font-size: 1.1rem; color: var(--dark); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-email { color: #888; font-size: 0.85rem; margin-top: 2px; }
 .dropdown-body { padding: 8px 0; }
 .menu-item { display: flex; align-items: center; gap: 15px; padding: 12px 20px; cursor: pointer; transition: all 0.2s; color: #555; font-size: 0.95rem; font-weight: 500; }
