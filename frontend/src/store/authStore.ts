@@ -6,7 +6,7 @@ export const authStore = reactive({
   isAuthenticated: false,
   isLoading: false,
 
-  // Giả lập Login
+  // --- LOGIC ĐĂNG NHẬP (CŨ) ---
   async login(payload: { email: string; password: string }) {
     this.isLoading = true;
     return new Promise((resolve, reject) => {
@@ -28,14 +28,60 @@ export const authStore = reactive({
     });
   },
 
-  // THÊM: phone vào payload
+  // --- LOGIC ĐĂNG KÝ (CŨ) ---
   async register(payload: { name: string; email: string; phone: string; password: string }) {
     this.isLoading = true;
     return new Promise((resolve) => {
       setTimeout(() => {
         this.isLoading = false;
-        console.log('Register Data:', payload); // Log ra để kiểm tra
+        console.log('Register Data:', payload);
         this.setUser(new Date().getTime(), payload.name, payload.email, 'CUSTOMER');
+        resolve(true);
+      }, 1000);
+    });
+  },
+
+  // --- LOGIC QUÊN MẬT KHẨU (MỚI) ---
+  
+  // Bước 1: Gửi OTP
+  async sendOtp(email: string) {
+    this.isLoading = true;
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        this.isLoading = false;
+        // Giả lập: Email phải chứa '@' mới hợp lệ
+        if (email.includes('@')) {
+          console.log(`[MOCK EMAIL] OTP cho ${email} là: 123456`);
+          resolve(true);
+        } else {
+          reject('Email không tồn tại trong hệ thống!');
+        }
+      }, 1000);
+    });
+  },
+
+  // Bước 2: Kiểm tra OTP
+  async verifyOtp(email: string, code: string) {
+    this.isLoading = true;
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        this.isLoading = false;
+        if (code === '123456') { // Mã mặc định để test
+          resolve(true);
+        } else {
+          reject('Mã xác nhận không đúng. Vui lòng thử lại (Gợi ý: 123456)');
+        }
+      }, 800);
+    });
+  },
+
+  // Bước 3: Đặt lại mật khẩu
+  async resetPassword(email: string, newPass: string) {
+    this.isLoading = true;
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        this.isLoading = false;
+        console.log(`[DB UPDATE] User ${email} đổi pass thành: ${newPass}`);
         resolve(true);
       }, 1000);
     });
