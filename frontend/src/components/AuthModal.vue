@@ -5,20 +5,34 @@
         <button class="btn-close" @click="close">✕</button>
         
         <div class="modal-left">
-          <h3>Welcome Back</h3>
-          <p>Đăng nhập để nhận ưu đãi và quản lý lịch đặt bàn.</p>
+          <h3 v-if="authMode === 'forgot'">Recovery</h3>
+          <h3 v-else>Welcome Back</h3>
+          
+          <p v-if="authMode === 'forgot'">
+            Khôi phục quyền truy cập vào tài khoản của bạn chỉ với vài bước đơn giản.
+          </p>
+          <p v-else>Đăng nhập để nhận ưu đãi và quản lý lịch đặt bàn.</p>
         </div>
 
         <div class="modal-right">
-          <div class="auth-toggle">
-            <button :class="{ active: isLoginMode }" @click="switchMode(true)">Đăng Nhập</button>
-            <button :class="{ active: !isLoginMode }" @click="switchMode(false)">Đăng Ký</button>
+          
+          <div class="auth-toggle" v-if="authMode !== 'forgot'">
+            <button :class="{ active: authMode === 'login' }" @click="switchMode('login')">Đăng Nhập</button>
+            <button :class="{ active: authMode === 'register' }" @click="switchMode('register')">Đăng Ký</button>
+          </div>
+
+          <div v-else class="forgot-header">
+            <h2>Quên Mật Khẩu</h2>
+            <p v-if="forgotStep === 1">Nhập email để nhận mã xác thực</p>
+            <p v-if="forgotStep === 2">Nhập mã OTP đã gửi tới email</p>
+            <p v-if="forgotStep === 3">Tạo mật khẩu mới</p>
           </div>
 
           <form @submit.prevent="handleSubmit" class="auth-form">
             <div class="input-group">
+              
               <input 
-                v-if="!isLoginMode" 
+                v-if="authMode === 'register'" 
                 v-model="form.name" 
                 type="text" 
                 placeholder="Tên hiển thị" 
@@ -26,31 +40,41 @@
               >
               
               <input 
+                v-if="authMode !== 'forgot' || (authMode === 'forgot' && forgotStep === 1)"
                 v-model="form.email" 
                 type="email" 
                 placeholder="Email" 
                 required
+                :disabled="authMode === 'forgot' && forgotStep > 1" 
               >
 
               <input 
-                v-if="!isLoginMode" 
+                v-if="authMode === 'register'" 
                 v-model="form.phone" 
                 type="tel" 
                 placeholder="Số điện thoại" 
                 pattern="[0-9]{10}"
-                title="Vui lòng nhập số điện thoại 10 số"
                 required
               >
 
               <input 
+                v-if="authMode === 'forgot' && forgotStep === 2"
+                v-model="form.otp"
+                type="text"
+                placeholder="Nhập mã OTP (Test: 123456)"
+                required
+              >
+
+              <input 
+                v-if="authMode !== 'forgot' || (authMode === 'forgot' && forgotStep === 3)"
                 v-model="form.password" 
                 type="password" 
-                placeholder="Mật khẩu" 
+                :placeholder="authMode === 'forgot' ? 'Mật khẩu mới' : 'Mật khẩu'" 
                 required
               >
 
               <input 
-                v-if="!isLoginMode"
+                v-if="authMode === 'register' || (authMode === 'forgot' && forgotStep === 3)"
                 v-model="form.confirmPassword" 
                 type="password" 
                 placeholder="Xác nhận mật khẩu" 
@@ -58,11 +82,25 @@
               >
             </div>
 
+            <div class="forgot-link" v-if="authMode === 'login'">
+              <a href="#" @click.prevent="switchMode('forgot')">Quên mật khẩu?</a>
+            </div>
+
             <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
 
             <button type="submit" class="btn-submit" :disabled="authStore.isLoading">
-              {{ authStore.isLoading ? 'Đang xử lý...' : (isLoginMode ? 'Đăng Nhập' : 'Tạo Tài Khoản') }}
+              {{ buttonText }}
             </button>
+
+            <button 
+              v-if="authMode === 'forgot'" 
+              type="button" 
+              class="btn-back" 
+              @click="switchMode('login')"
+            >
+              Quay lại Đăng nhập
+            </button>
+
           </form>
         </div>
       </div>
@@ -71,85 +109,126 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { authStore } from '../store/authStore';
 
-const props = defineProps<{
-  isVisible: boolean;
-}>();
-
+defineProps<{ isVisible: boolean }>();
 const emit = defineEmits(['close', 'success']);
 
-// UI States
-const isLoginMode = ref(true);
+// State quản lý chế độ: 'login' | 'register' | 'forgot'
+const authMode = ref<'login' | 'register' | 'forgot'>('login');
+const forgotStep = ref(1); // 1: Email, 2: OTP, 3: New Pass
 const errorMsg = ref('');
 
-// Form Data Update
 const form = reactive({
   name: '',
   email: '',
   phone: '',
   password: '',
-  confirmPassword: '' // Field mới để validate
+  confirmPassword: '',
+  otp: '' // Thêm trường OTP
 });
 
-const switchMode = (isLogin: boolean) => {
-  isLoginMode.value = isLogin;
+// Computed Text cho nút bấm
+const buttonText = computed(() => {
+  if (authStore.isLoading) return 'Đang xử lý...';
+  if (authMode.value === 'login') return 'Đăng Nhập';
+  if (authMode.value === 'register') return 'Tạo Tài Khoản';
+  // Forgot Password Steps
+  if (forgotStep.value === 1) return 'Gửi Mã Xác Nhận';
+  if (forgotStep.value === 2) return 'Xác Nhận OTP';
+  return 'Đổi Mật Khẩu';
+});
+
+const switchMode = (mode: 'login' | 'register' | 'forgot') => {
+  authMode.value = mode;
   errorMsg.value = '';
+  forgotStep.value = 1; // Reset step khi chuyển mode
+  resetForm();
 };
 
 const close = () => {
   emit('close');
   errorMsg.value = '';
+  switchMode('login'); // Reset về login lần sau mở
 };
 
 const handleSubmit = async () => {
   errorMsg.value = '';
-  
-  // 1. Kiểm tra xác nhận mật khẩu trước khi gọi Store
-  if (!isLoginMode.value) {
-    if (form.password !== form.confirmPassword) {
-      errorMsg.value = 'Mật khẩu xác nhận không trùng khớp!';
-      return; // Dừng lại, không gửi data đi
-    }
-  }
 
   try {
-    if (isLoginMode.value) {
-      await authStore.login({ 
-        email: form.email, 
-        password: form.password 
-      });
-    } else {
+    // --- XỬ LÝ LOGIN ---
+    if (authMode.value === 'login') {
+      await authStore.login({ email: form.email, password: form.password });
+      emit('success');
+      close();
+    } 
+    
+    // --- XỬ LÝ REGISTER ---
+    else if (authMode.value === 'register') {
+      if (form.password !== form.confirmPassword) {
+        errorMsg.value = 'Mật khẩu xác nhận không khớp!';
+        return;
+      }
       await authStore.register({ 
         name: form.name, 
         email: form.email, 
-        phone: form.phone, // Gửi thêm số điện thoại
+        phone: form.phone, 
         password: form.password 
       });
+      emit('success');
+      close();
     }
-    
-    // Reset form & emit success
-    resetForm();
-    emit('success');
-    close();
+
+    // --- XỬ LÝ FORGOT PASSWORD (3 BƯỚC) ---
+    else if (authMode.value === 'forgot') {
+      
+      // Bước 1: Gửi OTP
+      if (forgotStep.value === 1) {
+        await authStore.sendOtp(form.email);
+        alert('Mã OTP đã gửi! (Check console log F12: 123456)');
+        forgotStep.value = 2;
+      }
+      
+      // Bước 2: Check OTP
+      else if (forgotStep.value === 2) {
+        await authStore.verifyOtp(form.email, form.otp);
+        forgotStep.value = 3;
+      }
+      
+      // Bước 3: Đổi Pass
+      else if (forgotStep.value === 3) {
+        if (form.password !== form.confirmPassword) {
+          errorMsg.value = 'Mật khẩu xác nhận không khớp!';
+          return;
+        }
+        await authStore.resetPassword(form.email, form.password);
+        alert('Đổi mật khẩu thành công! Vui lòng đăng nhập.');
+        switchMode('login'); // Quay về login
+      }
+    }
+
   } catch (err: any) {
     errorMsg.value = err || 'Đã có lỗi xảy ra.';
   }
 };
 
 const resetForm = () => {
+  // Giữ lại email nếu đang ở bước forgot password
+  if (authMode.value !== 'forgot') form.email = '';
+  
   form.name = '';
-  form.email = '';
   form.phone = '';
   form.password = '';
   form.confirmPassword = '';
+  form.otp = '';
 };
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&display=swap');
 
+/* Giữ nguyên các class cũ (modal-overlay, modal-container, modal-left, v.v.) */
 .modal-overlay { 
   position: fixed; inset: 0; 
   background: rgba(0,0,0,0.7); 
@@ -159,7 +238,7 @@ const resetForm = () => {
 }
 
 .modal-container { 
-  width: 800px; height: 550px; /* Tăng chiều cao xíu để chứa thêm input */
+  width: 800px; height: 550px; 
   background: #fff; border-radius: 20px; 
   display: flex; position: relative; overflow: hidden;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -190,11 +269,12 @@ const resetForm = () => {
 .modal-left h3 { font-size: 2rem; margin-bottom: 10px; font-weight: 700; }
 
 .modal-right { 
-  flex: 1; padding: 40px 50px; /* Giảm padding top/bottom xíu */
+  flex: 1; padding: 40px 50px; 
   display: flex; flex-direction: column; justify-content: center; 
   font-family: 'Montserrat', sans-serif;
 }
 
+/* Auth Toggle */
 .auth-toggle { 
   display: flex; margin-bottom: 20px; 
   background: #f2f2f2; padding: 5px; border-radius: 30px; 
@@ -209,14 +289,17 @@ const resetForm = () => {
   box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
 }
 
-/* Scroll cho input group nếu quá nhiều trường */
+/* Forgot Header Style */
+.forgot-header { text-align: center; margin-bottom: 20px; }
+.forgot-header h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 5px; color: #1a1a1a; }
+.forgot-header p { font-size: 0.9rem; color: #666; }
+
+/* Input Group */
 .input-group {
   max-height: 320px;
   overflow-y: auto;
-  padding: 2px; /* Tránh bị mất box-shadow focus */
+  padding: 2px;
 }
-
-/* Ẩn scrollbar */
 .input-group::-webkit-scrollbar { width: 0; background: transparent; }
 
 .input-group input { 
@@ -225,9 +308,13 @@ const resetForm = () => {
   border-radius: 8px; box-sizing: border-box; 
   font-family: 'Montserrat', sans-serif; outline: none; transition: 0.3s;
 }
-.input-group input:focus {
-  background: #fff; border-color: #a67c52;
-}
+.input-group input:focus { background: #fff; border-color: #a67c52; }
+.input-group input:disabled { background: #eee; color: #999; cursor: not-allowed; }
+
+/* Links & Buttons */
+.forgot-link { text-align: right; margin-bottom: 15px; font-size: 0.85rem; }
+.forgot-link a { color: #a67c52; text-decoration: none; font-weight: 500; }
+.forgot-link a:hover { text-decoration: underline; }
 
 .btn-submit { 
   width: 100%; padding: 14px; margin-top: 10px;
@@ -237,6 +324,13 @@ const resetForm = () => {
 }
 .btn-submit:hover:not(:disabled) { background: #a67c52; }
 .btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.btn-back {
+  width: 100%; padding: 10px; margin-top: 10px;
+  background: transparent; color: #666; border: none;
+  font-weight: 500; cursor: pointer; font-size: 0.9rem;
+}
+.btn-back:hover { color: #1a1a1a; }
 
 .error-msg { 
   color: #e74c3c; margin-bottom: 15px; 
