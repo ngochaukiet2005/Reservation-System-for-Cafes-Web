@@ -41,6 +41,10 @@
                     <span class="menu-icon">✏️</span>
                     <span class="menu-text">Chỉnh sửa hồ sơ</span>
                   </div>
+                  <div class="menu-item" @click="openChangePassword">
+                    <span class="menu-icon">🔒</span>
+                    <span class="menu-text">Đổi mật khẩu</span>
+                  </div>
                   <div class="menu-divider"></div>
                   <div class="menu-item" @click="goToDashboard">
                     <span class="menu-icon">⚙️</span>
@@ -62,7 +66,7 @@
         </div>
       </div>
     </nav>
-
+  
     <header class="hero">
       <div class="hero-overlay"></div>
       <div class="hero-content">
@@ -139,7 +143,10 @@
       @close="showModal = false"
       @success="handleLoginSuccess"
     />
-
+    <ChangePasswordModal 
+      :isVisible="showChangePassModal" 
+      @close="showChangePassModal = false"
+    />
   </div>
 </template>
 
@@ -148,6 +155,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { authStore } from '../store/authStore';
 import AuthModal from '../components/AuthModal.vue'; // Import component mới
+import ChangePasswordModal from '../components/ChangePasswordModal.vue';
 
 const router = useRouter();
 
@@ -156,7 +164,8 @@ const isScrolled = ref(false);
 const showModal = ref(false);
 const showUserMenu = ref(false);
 const redirectAfterLogin = ref(false);
-
+const showAuthModal = ref(false);
+const showChangePassModal = ref(false);
 // Dữ liệu mẫu (giữ nguyên)
 const bestSellers = [
   { name: 'Salted Caramel Latte', desc: 'Sự hòa quyện giữa vị mặn nhẹ và ngọt ngào.', price: '65.000đ', img: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?ixlib=rb-4.0.3&w=600&q=80' },
@@ -174,6 +183,13 @@ const scrollToSection = (sectionId: string) => {
 const handleScroll = () => { isScrolled.value = window.scrollY > 50; };
 onMounted(() => window.addEventListener('scroll', handleScroll));
 onUnmounted(() => window.removeEventListener('scroll', handleScroll));
+
+// --- [THÊM MỚI] HÀM MỞ MODAL ---
+const openChangePassword = () => {
+  showUserMenu.value = false; // Đóng menu dropdown
+  showChangePassModal.value = true; // Mở modal popup
+};
+// ------------------------------
 
 // Logic Modal mới
 const openAuthModal = (shouldRedirect: boolean) => {
