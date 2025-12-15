@@ -86,7 +86,26 @@ export const authStore = reactive({
       }, 1000);
     });
   },
-
+  // --- THÊM HÀM NÀY VÀO DƯỚI CÙNG CỦA OBJECT ---
+  
+  // Giả lập đổi mật khẩu
+  async changePassword(payload: { currentPass: string; newPass: string }) {
+    this.isLoading = true;
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        this.isLoading = false;
+        
+        // Giả lập logic Backend: 
+        // Kiểm tra mật khẩu hiện tại có đúng là '123456' không (hoặc pass bất kỳ bạn muốn test)
+        if (payload.currentPass !== '123456') {
+          reject('Mật khẩu hiện tại không chính xác!');
+        } else {
+          console.log('[MOCK DB] Đã cập nhật mật khẩu mới:', payload.newPass);
+          resolve(true); // Thành công
+        }
+      }, 1000);
+    });
+  },
   logout() {
     this.token = '';
     this.user = null;
