@@ -1,5 +1,33 @@
-export class TableEntity {
-  id!: number;
-  name!: string;
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { TableStatus } from './table-status.entity';
+
+@Entity('cafe_tables')
+export class CafeTable {
+  @PrimaryGeneratedColumn({ type: 'bigint' })
+  id!: string;
+
+  @Column({ type: 'int' })
   capacity!: number;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  area?: string;
+
+  @ManyToOne(() => TableStatus, { nullable: false })
+  @JoinColumn({ name: 'status_id' })
+  status!: TableStatus;
+
+  @Column({ type: 'bigint' })
+  status_id!: string;
+
+  @Column({ type: 'text', nullable: true })
+  disabled_reason?: string;
+
+  @Column({ type: 'int', nullable: true })
+  sort_order?: number;
+
+  @Column({ type: 'timestamp', default: () => 'NOW()' })
+  created_at!: Date;
+
+  @Column({ type: 'timestamp', default: () => 'NOW()' })
+  updated_at!: Date;
 }
