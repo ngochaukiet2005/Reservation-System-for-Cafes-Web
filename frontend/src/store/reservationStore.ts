@@ -15,6 +15,7 @@ export interface Reservation {
   time: string; // ISO String
   people: number;
   tableId: number | null;
+  tableName?: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
 }
 
@@ -44,7 +45,14 @@ const MOCK_TABLES: Table[] = [
   { id: 117, name: 'Bàn 17', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
   { id: 118, name: 'Bàn 18', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
   { id: 119, name: 'Bàn 19', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
-  { id: 120, name: 'Bàn 20', capacity: 8, status: 'AVAILABLE', type: 'Outdoor' },
+  { id: 120, name: 'Bàn 20', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
+];
+
+// [MỚI] Dữ liệu lịch sử giả lập
+const MOCK_HISTORY: Reservation[] = [
+  { id: 901, guestName: 'Nguyễn Văn A', phone: '0901234567', time: '2023-11-20T09:00:00', people: 2, tableId: 105, tableName: 'Bàn 05', status: 'COMPLETED' },
+  { id: 902, guestName: 'Nguyễn Văn A', phone: '0901234567', time: '2023-12-15T14:30:00', people: 4, tableId: 112, tableName: 'Bàn 12', status: 'PENDING' },
+  { id: 903, guestName: 'Nguyễn Văn A', phone: '0901234567', time: '2023-12-10T19:00:00', people: 2, tableId: 102, tableName: 'Bàn 02', status: 'CANCELLED' },
 ];
 
 export const reservationStore = reactive({
@@ -97,5 +105,29 @@ export const reservationStore = reactive({
   },
   
   // Hàm này để sau này dùng cho trang Lịch sử
-  async fetchReservations() { return []; }
+  // [SỬA] Hàm lấy lịch sử đặt bàn
+  async fetchReservations() { 
+    this.isLoading = true;
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // Gán dữ liệu giả vào store
+        this.reservations = [...MOCK_HISTORY];
+        this.isLoading = false;
+        resolve(this.reservations);
+      }, 500);
+    });
+  },
+  async cancelReservation(id: number) {
+    this.isLoading = true;
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const target = this.reservations.find(r => r.id === id);
+        if (target) {
+          target.status = 'CANCELLED';
+        }
+        this.isLoading = false;
+        resolve(true);
+      }, 500);
+    });
+  }
 });
