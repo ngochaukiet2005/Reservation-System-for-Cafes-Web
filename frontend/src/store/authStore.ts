@@ -1,14 +1,15 @@
 // frontend/src/store/authStore.ts
 import { reactive } from 'vue';
+import { authApi } from '../api/authApi';
 
 // 1. Định nghĩa lại User Interface
 interface User {
   id: number;
   name: string;
   email: string;
-  phone: string;
-  address: string;
-  gender: 'Nam' | 'Nữ';
+  phone?: string;
+  address?: string;
+  gender?: 'Nam' | 'Nữ';
   role: 'ADMIN' | 'STAFF' | 'CUSTOMER';
   avatar?: string;
 }
@@ -25,48 +26,71 @@ export const authStore = reactive({
   
   isLoading: false,
 
-  // --- LOGIC ĐĂNG NHẬP ---
+  // --- LOGIC ĐĂNG NHẬP - GỌI API THỰC ---
   async login(payload: { email: string; password: string }) {
     this.isLoading = true;
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        this.isLoading = false;
-      
-        if (payload.email.includes('admin')) {
-          this.setUser(1, 'Admin User', payload.email, '0909000111', 'Hà Nội', 'Nam', 'ADMIN', AVATAR_MALE);
-          resolve(true);
-        } else if (payload.email.includes('staff')) {
-          this.setUser(2, 'Staff User', payload.email, '0909000222', 'Đà Nẵng', 'Nam', 'STAFF', AVATAR_MALE);
-          resolve(true);
-        } else if (payload.email.includes('@')) {
-          // --- LOGIC TÊN HIỂN THỊ ---
-          // Lấy phần trước @ làm tên (VD: tuan.nguyen@... -> tuan.nguyen)
-          const name = payload.email.split('@')[0]; 
-          
-          this.setUser(3, name, payload.email, '0909000333', 'TP.HCM', 'Nữ', 'CUSTOMER', AVATAR_FEMALE);
-          resolve(true);
-        } else {
-          reject('Email hoặc mật khẩu không đúng!');
-        }
-      }, 800);
-    });
+    try {
+      const response = await authApi.login(payload);
+      const { token, user } = response.data;
+
+      // Lấy avatar dựa trên role
+      const avatar = user.role === 'ADMIN' || user.role === 'STAFF' ? AVATAR_MALE : AVATAR_FEMALE;
+
+      this.setUser(
+        user.id,
+        user.name, // Lấy từ backend (user_name)
+        user.email,
+        user.phone || '',
+        '',
+        'Nam',
+        user.role,
+        avatar
+      );
+
+      this.token = token;
+      localStorage.setItem('auth_token', token);
+
+      this.isLoading = false;
+      return true;
+    } catch (error: any) {
+      this.isLoading = false;
+      throw error.response?.data?.message || 'Đăng nhập thất bại!';
+    }
   },
 
-  // --- LOGIC ĐĂNG KÝ ---
+  // --- LOGIC ĐĂNG KÝ - GỌI API THỰC ---
   async register(payload: { name: string; email: string; phone: string; address: string; gender: 'Nam' | 'Nữ'; password: string }) {
     this.isLoading = true;
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        this.isLoading = false;
-        
-        // Tự động chọn avatar theo giới tính khi đăng ký
-        const initialAvatar = payload.gender === 'Nam' ? AVATAR_MALE : AVATAR_FEMALE;
+    try {
+      const response = await authApi.register({
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+      });
 
-        // Đăng ký xong tự động đăng nhập và lưu luôn
-        this.setUser(Date.now(), payload.name, payload.email, payload.phone, payload.address, payload.gender, 'CUSTOMER', initialAvatar);
-        resolve(true);
-      }, 1000);
-    });
+      const { token, user } = response.data;
+      const avatar = payload.gender === 'Nam' ? AVATAR_MALE : AVATAR_FEMALE;
+
+      this.setUser(
+        user.id,
+        user.name,
+        user.email,
+        payload.phone,
+        payload.address,
+        payload.gender,
+        user.role,
+        avatar
+      );
+
+      this.token = token;
+      localStorage.setItem('auth_token', token);
+
+      this.isLoading = false;
+      return true;
+    } catch (error: any) {
+      this.isLoading = false;
+      throw error.response?.data?.message || 'Đăng ký thất bại!';
+    }
   },
 
   // --- CẬP NHẬT THÔNG TIN ---
@@ -120,12 +144,10 @@ export const authStore = reactive({
 
   // --- SET USER (Lưu cả Storage) ---
   setUser(id: number, name: string, email: string, phone: string, address: string, gender: 'Nam'|'Nữ', role: any, avatar: string) {
-    this.token = 'fake-jwt-token-123';
     this.user = { id, name, email, phone, address, gender, role, avatar };
     this.isAuthenticated = true;
 
     // Lưu vào localStorage ngay khi set user
-    localStorage.setItem('auth_token', this.token);
     localStorage.setItem('auth_user', JSON.stringify(this.user));
   },
 

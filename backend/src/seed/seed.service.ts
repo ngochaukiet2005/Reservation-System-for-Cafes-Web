@@ -1,13 +1,16 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 
 import { Role } from '../roles/entities/role.entity';
 import { User } from '../users/entities/user.entity';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@cafe.local';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'Admin@123';
-const ADMIN_NAME = process.env.ADMIN_NAME ?? 'Administrator';
-const ADMIN_ROLE_NAME = 'admin';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@cafe.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin123';
+const ADMIN_NAME = process.env.ADMIN_NAME ?? 'Admin User';
+const ADMIN_ROLE_NAME = 'ADMIN';
+const STAFF_ROLE_NAME = 'STAFF';
+const CUSTOMER_ROLE_NAME = 'CUSTOMER';
 
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -16,31 +19,46 @@ export class SeedService implements OnModuleInit {
   constructor(private readonly dataSource: DataSource) {}
 
   async onModuleInit() {
+    await this.ensureRoles();
     await this.ensureAdminUser();
+  }
+
+  private async ensureRoles() {
+    const roleRepository = this.dataSource.getRepository(Role);
+
+    for (const roleName of [ADMIN_ROLE_NAME, STAFF_ROLE_NAME, CUSTOMER_ROLE_NAME]) {
+      let role = await roleRepository.findOne({ where: { name: roleName } });
+      if (!role) {
+        role = roleRepository.create({ name: roleName });
+        await roleRepository.save(role);
+        this.logger.log(`✓ Created role '${roleName}'`);
+      }
+    }
   }
 
   private async ensureAdminUser() {
     const roleRepository = this.dataSource.getRepository(Role);
     const userRepository = this.dataSource.getRepository(User);
 
-    let adminRole = await roleRepository.findOne({ where: { name: ADMIN_ROLE_NAME } });
+    const adminRole = await roleRepository.findOne({ where: { name: ADMIN_ROLE_NAME } });
     if (!adminRole) {
-      adminRole = roleRepository.create({ name: ADMIN_ROLE_NAME });
-      adminRole = await roleRepository.save(adminRole);
-      this.logger.log(`Created default role '${ADMIN_ROLE_NAME}'`);
+      this.logger.error(`Admin role not found!`);
+      return;
     }
 
     let existingAdmin = await userRepository.findOne({ where: { email: ADMIN_EMAIL } });
     
-    // Xóa admin cũ nếu có (để tạo lại với password mới)
     if (existingAdmin) {
-      await userRepository.remove(existingAdmin);
-      this.logger.log(`Removed existing admin user to recreate with plain password`);
+      this.logger.log(`✓ Admin user already exists: ${ADMIN_EMAIL}`);
+      return;
     }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
 
     const adminUser = userRepository.create({
       email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
+      password: hashedPassword,
       user_name: ADMIN_NAME,
       role_id: adminRole.id,
       role: adminRole,
@@ -49,6 +67,6 @@ export class SeedService implements OnModuleInit {
     });
 
     await userRepository.save(adminUser);
-    this.logger.log(`Created default admin user '${ADMIN_EMAIL}' with password '${ADMIN_PASSWORD}'`);
+    this.logger.log(`✓ Created admin user: ${ADMIN_EMAIL} (password: ${ADMIN_PASSWORD})`);
   }
 }
