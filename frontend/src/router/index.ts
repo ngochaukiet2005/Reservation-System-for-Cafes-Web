@@ -1,19 +1,33 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import HomeView from '../views/HomeView.vue'; // <-- File mới
+import HomeView from '../views/HomeView.vue';
 import CustomerReservationView from '../views/customer/CustomerReservationView.vue';
 import CustomerHistoryView from '../views/customer/CustomerHistoryView.vue';
 import StaffDashboardView from '../views/staff/StaffDashboardView.vue';
-// import AdminDashboardView from '../views/admin/AdminDashboardView.vue';
 
 const routes = [
-  { path: '/', component: HomeView }, // Trang chủ là trang đầu tiên
+  // 1. Trang chủ (Không cần Sidebar khách hàng)
+  { 
+    path: '/', 
+    component: HomeView 
+  }, 
 
-  // Customer Routes
-  { path: '/reservation', component: CustomerReservationView },
-  { path: '/history', component: CustomerHistoryView },
+  // 2. Các trang Khách hàng (CẦN Sidebar khách hàng -> Thêm meta: layout 'customer')
+  { 
+    path: '/reservation', 
+    component: CustomerReservationView,
+    meta: { layout: 'customer' } 
+  },
+  { 
+    path: '/history', 
+    component: CustomerHistoryView,
+    meta: { layout: 'customer' } 
+  },
 
-  // Staff Routes
-  { path: '/staff/dashboard', component: StaffDashboardView },
+  // 3. Trang Staff (Tự có giao diện riêng -> Không cần meta layout)
+  { 
+    path: '/staff/dashboard', 
+    component: StaffDashboardView 
+  },
   
   // Admin Routes...
 ];
