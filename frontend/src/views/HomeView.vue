@@ -50,11 +50,8 @@
                     <span class="menu-icon">🔒</span>
                     <span class="menu-text">Đổi mật khẩu</span>
                   </div>
+                  
                   <div class="menu-divider"></div>
-                  <div class="menu-item" @click="goToDashboard">
-                    <span class="menu-icon">⚙️</span>
-                    <span class="menu-text">Trang quản lý</span>
-                  </div>
                   <div class="menu-item" @click="goToHistory">
                     <span class="menu-icon">📜</span>
                     <span class="menu-text">Lịch sử đặt bàn</span>
@@ -205,7 +202,23 @@ const openAuthModal = (shouldRedirect: boolean) => {
   showModal.value = true;
 };
 
+// [UPDATED] Xử lý chuyển hướng sau đăng nhập
 const handleLoginSuccess = () => {
+  const role = authStore.user?.role;
+
+  // 1. Admin -> Dashboard Admin
+  if (role === 'ADMIN') {
+    router.push('/admin/dashboard');
+    return;
+  }
+  
+  // 2. Staff -> Dashboard Staff
+  if (role === 'STAFF') {
+    router.push('/staff/dashboard');
+    return;
+  }
+
+  // 3. Khách hàng -> Giữ nguyên logic cũ
   if (redirectAfterLogin.value) {
     goToReservation();
   }
@@ -232,7 +245,7 @@ const handleEditProfile = () => {
 
 const goToReservation = () => router.push('/reservation');
 const goToHistory = () => router.push('/history');
-const goToDashboard = () => router.push('/staff/dashboard');
+// [ĐÃ XÓA] const goToDashboard = ... (Không còn dùng nữa)
 </script>
 
 <style scoped>

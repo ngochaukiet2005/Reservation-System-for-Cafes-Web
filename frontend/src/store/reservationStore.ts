@@ -53,6 +53,8 @@ const MOCK_HISTORY: Reservation[] = [
   { id: 901, guestName: 'Nguyễn Văn A', phone: '0901234567', time: '2023-11-20T09:00:00', people: 2, tableId: 105, tableName: 'Bàn 05', status: 'COMPLETED' },
   { id: 902, guestName: 'Nguyễn Văn A', phone: '0901234567', time: '2023-12-15T14:30:00', people: 4, tableId: 112, tableName: 'Bàn 12', status: 'PENDING' },
   { id: 903, guestName: 'Nguyễn Văn A', phone: '0901234567', time: '2023-12-10T19:00:00', people: 2, tableId: 102, tableName: 'Bàn 02', status: 'CANCELLED' },
+  // Thêm một đơn CONFIRMED để test tính năng nhập lý do hủy
+  { id: 904, guestName: 'Nguyễn Văn A', phone: '0901234567', time: new Date().toISOString(), people: 4, tableId: 114, tableName: 'Bàn 14', status: 'CONFIRMED' },
 ];
 
 export const reservationStore = reactive({
@@ -104,25 +106,31 @@ export const reservationStore = reactive({
     });
   },
   
-  // Hàm này để sau này dùng cho trang Lịch sử
-  // [SỬA] Hàm lấy lịch sử đặt bàn
+  // Hàm lấy lịch sử đặt bàn
   async fetchReservations() { 
     this.isLoading = true;
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Gán dữ liệu giả vào store
-        this.reservations = [...MOCK_HISTORY];
+        // Nếu store chưa có dữ liệu thì mới nạp Mock, tránh bị reset khi thao tác
+        if (this.reservations.length === 0) {
+            this.reservations = [...MOCK_HISTORY];
+        }
         this.isLoading = false;
         resolve(this.reservations);
       }, 500);
     });
   },
-  async cancelReservation(id: number) {
+
+  // [UPDATED] Hỗ trợ tham số reason từ FR-7.1
+  async cancelReservation(id: number, reason: string = '') {
     this.isLoading = true;
     return new Promise((resolve) => {
       setTimeout(() => {
         const target = this.reservations.find(r => r.id === id);
         if (target) {
+          // Logic thực tế: Gửi API reason lên server
+          console.log(`[API] Hủy đơn #${id}. Lý do: ${reason || 'Không có'}`);
+          
           target.status = 'CANCELLED';
         }
         this.isLoading = false;

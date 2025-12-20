@@ -1,39 +1,94 @@
 import { httpClient } from './httpClient';
 
+// --- CẤU HÌNH: Đặt true để test giao diện, đặt false khi kết nối Backend ---
+const IS_MOCK_MODE = true; 
+
 export const authApi = {
-  login: (payload: unknown) => httpClient.post('/auth/login', payload),
-  register: (payload: unknown) => httpClient.post('/auth/register', payload),
-  // 1. Gửi yêu cầu quên mật khẩu (Kiểm tra email & gửi mã)
-  async forgotPassword(email: string) {
-    console.log(`[Mock API] Đang kiểm tra email và gửi OTP tới: ${email}`);
-    // Giả lập độ trễ mạng
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    // Giả lập logic: Trả về thành công
-    // Khi có Backend: return httpClient.post('/auth/forgot-password', { email });
-    return { success: true, message: 'Mã xác nhận đã được gửi!' };
+  // 1. Đăng nhập (Chế độ Mock thông minh)
+  async login(payload: any) {
+    if (IS_MOCK_MODE) {
+      console.log(`[Mock API] Đăng nhập với: ${payload.email}`);
+      await new Promise((resolve) => setTimeout(resolve, 800)); // Giả lập mạng chậm 0.8s
+
+      // Logic giả lập: Phân quyền dựa trên Email người dùng nhập
+      let role = 'CUSTOMER';
+      let name = 'Khách Hàng Test';
+      
+      if (payload.email.includes('admin')) {
+        role = 'ADMIN';
+        name = 'Quản Trị Viên';
+      } else if (payload.email.includes('staff')) {
+        role = 'STAFF';
+        name = 'Nhân Viên Test';
+      }
+
+      // Trả về cấu trúc dữ liệu y hệt Backend thật
+      return {
+        data: {
+          token: 'mock-jwt-token-123456789',
+          user: {
+            id: Math.floor(Math.random() * 1000),
+            name: name,
+            email: payload.email,
+            phone: '0901234567',
+            address: 'TP.HCM',
+            role: role,
+            gender: 'Nam'
+          }
+        }
+      };
+    }
+    // Nếu tắt Mock Mode thì gọi API thật
+    return httpClient.post('/auth/login', payload);
   },
 
-  // 2. Kiểm tra mã OTP
-  async verifyOtp(email: string, code: string) {
-    console.log(`[Mock API] Kiểm tra OTP ${code} cho email ${email}`);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  // 2. Đăng ký (Mock)
+  async register(payload: any) {
+    if (IS_MOCK_MODE) {
+      console.log(`[Mock API] Đăng ký mới: ${payload.email}`);
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
-    // Giả lập logic: Nếu mã là '123456' thì đúng
+      return {
+        data: {
+          token: 'mock-jwt-token-register-999',
+          user: {
+            id: Date.now(),
+            name: payload.name,
+            email: payload.email,
+            phone: payload.phone,
+            address: payload.address,
+            role: 'CUSTOMER', // Mặc định đăng ký là Customer
+            gender: payload.gender || 'Nam'
+          }
+        }
+      };
+    }
+    return httpClient.post('/auth/register', payload);
+  },
+
+  // 3. Quên mật khẩu (Giữ nguyên Mock cũ của bạn)
+  async forgotPassword(email: string) {
+    console.log(`[Mock API] Gửi OTP quên mật khẩu tới: ${email}`);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return { success: true, message: 'Mã xác nhận đã được gửi (Mock: 123456)!' };
+  },
+
+  // 4. Kiểm tra OTP (Giữ nguyên Mock cũ)
+  async verifyOtp(email: string, code: string) {
+    console.log(`[Mock API] Verify OTP: ${code}`);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
     if (code === '123456') {
-      // Khi có Backend: return httpClient.post('/auth/verify-otp', { email, code });
       return { success: true };
     } else {
-      throw new Error('Mã xác nhận không chính xác (Thử nhập 123456)');
+      throw new Error('Mã xác nhận sai (Gợi ý: nhập 123456)');
     }
   },
 
-  // 3. Đặt lại mật khẩu mới
+  // 5. Reset mật khẩu (Giữ nguyên Mock cũ)
   async resetPassword(email: string, code: string, newPassword: string) {
-    console.log(`[Mock API] Đổi mật khẩu mới cho ${email}`);
+    console.log(`[Mock API] Đổi mật khẩu thành công cho ${email}`);
     await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Khi có Backend: return httpClient.post('/auth/reset-password', { email, code, newPassword });
     return { success: true, message: 'Đổi mật khẩu thành công!' };
   },
 };
