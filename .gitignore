@@ -8,17 +8,6 @@ dist/
 build/
 */build/
 
-# --- Environment Variables (Chặn file cấu hình bảo mật) ---
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*/.env
-!.env.example
-!*/. env.example
-*/.env.*
-
 # --- IDE & System Files (Chặn file cấu hình của máy cá nhân) ---
 .DS_Store
 .idea/
