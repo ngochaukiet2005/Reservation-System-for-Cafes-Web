@@ -14,7 +14,7 @@
         <div class="filter-item">
           <label>Giờ đến</label>
           <select v-model="filter.time" @change="loadTables">
-             <option v-for="h in ['08:00','09:00','10:00','14:00','19:00','20:00']" :key="h" :value="h">{{ h }}</option>
+             <option v-for="h in availableHours" :key="h" :value="h">{{ h }}</option>
           </select>
         </div>
         <div class="filter-item">
@@ -24,6 +24,12 @@
             <option :value="4">3-4 người</option>
             <option :value="6">5+ người</option>
           </select>
+        </div>
+        
+        <div class="filter-item" style="justify-content: flex-end;">
+          <button class="btn-suggest" @click="suggestTable">
+             ✨ Chọn nhanh
+          </button>
         </div>
       </div>
 
@@ -78,21 +84,17 @@
           <div class="success-icon">✓</div>
           <h3>Đặt Bàn Thành Công!</h3>
           <p>Cảm ơn bạn đã đặt bàn. Yêu cầu của bạn đang chờ nhân viên xác nhận.</p>
-          
           <div class="success-actions">
-            <button class="btn-primary" @click="confirmAndGoToHistory">
-              Đồng ý
-            </button>
+            <button class="btn-primary" @click="confirmAndGoToHistory">Đồng ý</button>
           </div>
         </div>
       </div>
     </transition>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { reservationStore, type Table } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
@@ -104,9 +106,18 @@ const showForm = ref(false);
 const showSuccessModal = ref(false);
 const selectedTable = ref<Table | null>(null);
 
+// [UPDATED] Tạo mảng giờ từ 08:00 đến 22:00
+const availableHours = computed(() => {
+  const hours = [];
+  for (let i = 8; i <= 22; i++) {
+    hours.push(`${i.toString().padStart(2, '0')}:00`);
+  }
+  return hours;
+});
+
 const filter = reactive({
   date: today,
-  time: '19:00',
+  time: '08:00',
   people: 2
 });
 
@@ -119,10 +130,17 @@ const selectTable = (table: Table) => {
   if (table.status === 'AVAILABLE') selectedTable.value = table;
 };
 
-// --- XỬ LÝ ĐẶT BÀN ---
+const suggestTable = () => {
+  if (reservationStore.isLoading || reservationStore.tables.length === 0) return;
+  const bestTable = reservationStore.tables.find(t => 
+    t.status === 'AVAILABLE' && t.capacity >= filter.people
+  );
+  if (bestTable) selectedTable.value = bestTable;
+  else alert("Rất tiếc, không còn bàn trống phù hợp với số lượng khách này.");
+};
+
 const handleBooking = async (formData: any) => {
   try {
-    // B1: Lưu vào Store
     await reservationStore.createReservation({
       ...formData,
       reservation_time: `${filter.date}T${filter.time}`,
@@ -130,36 +148,22 @@ const handleBooking = async (formData: any) => {
       tableId: selectedTable.value?.id,
       tableName: selectedTable.value?.name
     });
-
-    // B2: ĐÓNG BẢNG ĐIỀN THÔNG TIN TRƯỚC
     showForm.value = false;
-
-    // B3: Đợi 300ms cho Form đóng hẳn rồi mới hiện Thông Báo
-    setTimeout(() => {
-      showSuccessModal.value = true;
-    }, 300);
-
+    setTimeout(() => { showSuccessModal.value = true; }, 300);
   } catch (error) {
     alert('Có lỗi xảy ra, vui lòng thử lại');
   }
 };
 
-// --- XỬ LÝ KHI BẤM "ĐỒNG Ý" ---
 const confirmAndGoToHistory = () => {
-  // B4: Tắt thông báo
   showSuccessModal.value = false;
-
-  // B5: Đợi thông báo tắt hẳn (300ms) rồi mới chuyển trang
-  setTimeout(() => {
-    router.push('/history');
-  }, 300);
+  setTimeout(() => { router.push('/history'); }, 300);
 };
 
 onMounted(() => loadTables());
 </script>
 
 <style scoped>
-/* CSS cho Page & Map (Giữ nguyên) */
 .reservation-page { padding: 20px; display: flex; justify-content: center; padding-bottom: 100px; }
 .main-card { background: #fff; padding: 40px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); width: 100%; max-width: 900px; position: relative; }
 .header { text-align: center; margin-bottom: 30px; }
@@ -169,6 +173,9 @@ onMounted(() => loadTables());
 .filter-item { flex: 1; display: flex; flex-direction: column; }
 .filter-item label { font-size: 0.8rem; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase; }
 .filter-item input, .filter-item select { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; }
+
+.btn-suggest { height: 42px; background: #2ecc71; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.btn-suggest:hover { background: #27ae60; transform: translateY(-1px); }
 
 .legend { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; font-size: 0.9rem; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
@@ -186,58 +193,25 @@ onMounted(() => loadTables());
 .table-icon { width: 40px; height: 40px; background: #eee; border-radius: 8px; margin-bottom: 10px; opacity: 0.5; }
 .table-box.selected .table-icon { background: #2ecc71; opacity: 1; }
 
-/* Footer Fixed Action */
-.footer-action-fixed { 
-  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000;
-  background: #1a1a1a; color: #fff; padding: 12px 30px; border-radius: 50px;
-  display: flex; align-items: center; gap: 30px; box-shadow: 0 15px 40px rgba(0,0,0,0.3); min-width: 350px; justify-content: space-between;
-}
+.footer-action-fixed { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; background: #1a1a1a; color: #fff; padding: 12px 30px; border-radius: 50px; display: flex; align-items: center; gap: 30px; box-shadow: 0 15px 40px rgba(0,0,0,0.3); min-width: 350px; justify-content: space-between; }
 .selection-info strong { color: #2ecc71; }
 .selection-info small { color: #bbb; display: block; }
 .btn-continue { background: #a67c52; color: #fff; border: none; padding: 10px 25px; border-radius: 25px; font-weight: 700; cursor: pointer; transition: 0.2s; }
 .btn-continue:hover { background: #c59d70; transform: scale(1.05); }
 
-/* --- CSS SUCCESS MODAL (Đã chỉnh sửa animation) --- */
-.success-overlay {
-  position: fixed; inset: 0; 
-  background: rgba(255, 255, 255, 0.9); /* Nền trắng mờ */
-  backdrop-filter: blur(5px);
-  z-index: 3000; /* Luôn cao nhất */
-  display: flex; justify-content: center; align-items: center;
-}
-
-.success-box {
-  background: #fff; padding: 40px; border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-  text-align: center; max-width: 400px; width: 90%;
-  border: 1px solid #eee;
-  animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.success-icon {
-  width: 70px; height: 70px; background: #2ecc71; color: #fff;
-  border-radius: 50%; font-size: 35px; display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 20px; box-shadow: 0 10px 20px rgba(46, 204, 113, 0.3);
-}
-
+.success-overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(5px); z-index: 3000; display: flex; justify-content: center; align-items: center; }
+.success-box { background: #fff; padding: 40px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; border: 1px solid #eee; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.success-icon { width: 70px; height: 70px; background: #2ecc71; color: #fff; border-radius: 50%; font-size: 35px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 10px 20px rgba(46, 204, 113, 0.3); }
 .success-box h3 { color: #2ecc71; margin: 0 0 10px; font-size: 1.5rem; }
 .success-box p { color: #666; margin-bottom: 30px; line-height: 1.5; }
-
 .success-actions { display: flex; justify-content: center; }
-
-.btn-primary {
-  background: #1a1a1a; color: #fff; padding: 12px 40px; border-radius: 30px; border: none;
-  font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 1rem;
-}
+.btn-primary { background: #1a1a1a; color: #fff; padding: 12px 40px; border-radius: 30px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 1rem; }
 .btn-primary:hover { background: #333; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
 
-/* Animation Transition */
 .slide-up-enter-active { animation: slideUp 0.3s; }
 .slide-up-leave-active { animation: slideUp 0.3s reverse; }
 @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-
 .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-
 @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 </style>
