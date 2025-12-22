@@ -76,6 +76,7 @@
           <span><i class="dot pending"></i> Chờ duyệt</span>
           <span><i class="dot reserved"></i> Đã đặt</span>
           <span><i class="dot occupied"></i> Đang có khách</span>
+          <span><i class="dot maintenance"></i> Bảo trì</span>
         </div>
 
         <div v-if="reservationStore.isLoading" class="loading">Đang cập nhật sơ đồ...</div>
@@ -146,7 +147,6 @@ const showForm = ref(false);
 const showSuccessModal = ref(false);
 const selectedTable = ref<Table | null>(null);
 
-// State cho Custom Dropdown
 const showMinuteDropdown = ref(false);
 
 const OPEN_HOUR = 8;
@@ -197,7 +197,6 @@ const formatTimeDisplay = computed(() => {
     return `${filter.hour.toString().padStart(2,'0')}:${filter.minute.toString().padStart(2,'0')}`;
 });
 
-// --- Actions ---
 const toggleMinuteDropdown = () => {
     showMinuteDropdown.value = !showMinuteDropdown.value;
 };
@@ -265,6 +264,7 @@ const getStatusText = (status: string) => {
     if (status === 'PENDING') return 'Đợi duyệt';
     if (status === 'RESERVED') return 'Đã đặt';
     if (status === 'OCCUPIED') return 'Có khách';
+    if (status === 'MAINTENANCE') return 'Bảo trì';
     return status;
 };
 
@@ -300,7 +300,14 @@ onMounted(() => {
 <style scoped>
 /* Base Styles */
 .reservation-page { padding: 20px; display: flex; justify-content: center; padding-bottom: 100px; }
-.main-card { background: #fff; padding: 40px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); width: 100%; max-width: 900px; position: relative; z-index: 1; }
+
+/* FIX: Tăng z-index main-card lên 10 để nằm trên overlay (z-index 5) */
+.main-card { 
+    background: #fff; padding: 40px; border-radius: 20px; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.05); width: 100%; max-width: 900px; 
+    position: relative; 
+    z-index: 10; 
+}
 .header { text-align: center; margin-bottom: 30px; }
 .header h2 { color: #a67c52; font-family: 'Cormorant Garamond', serif; font-size: 2.5rem; margin-bottom: 5px; }
 
@@ -311,8 +318,21 @@ onMounted(() => {
 .filter-item label { font-size: 0.8rem; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase; }
 
 /* Inputs styling */
-.filter-item input, .filter-item select { padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.95rem; outline: none; background: #fff; height: 42px; }
+/* UPDATE: Đảm bảo input và select có độ rộng tương đồng, chiếm hết chiều ngang của filter-item */
+.filter-item input, .filter-item select { 
+    padding: 10px 15px; 
+    border: 1px solid #ddd; 
+    border-radius: 8px; 
+    font-family: inherit; 
+    font-size: 0.95rem; 
+    outline: none; 
+    background: #fff; 
+    height: 42px; 
+    width: 100%; /* Full width của parent */
+    box-sizing: border-box; /* Đảm bảo padding không làm vỡ layout */
+}
 .filter-item input:focus, .filter-item select:focus { border-color: #a67c52; }
+
 .time-group { display: flex; align-items: center; gap: 8px; }
 .time-group select { flex: 1; }
 .colon { font-weight: bold; }
@@ -336,6 +356,7 @@ onMounted(() => {
     font-weight: 500;
     font-size: 0.95rem;
     transition: border-color 0.2s;
+    box-sizing: border-box;
 }
 .cms-trigger:hover { border-color: #a67c52; }
 .chevron { font-size: 0.7rem; color: #888; transition: transform 0.2s; }
@@ -350,7 +371,6 @@ onMounted(() => {
     border: 1px solid #ddd;
     border-radius: 8px;
     z-index: 100;
-    /* QUAN TRỌNG: Giới hạn chiều cao hiển thị 5 dòng */
     max-height: 180px; 
     overflow-y: auto;
     box-shadow: 0 5px 15px rgba(0,0,0,0.1);
@@ -359,45 +379,60 @@ onMounted(() => {
 .cms-item:hover { background: #f5f5f5; color: #a67c52; }
 .cms-item.active { background: #e3f2fd; color: #1565c0; font-weight: bold; }
 .cms-empty { padding: 10px; text-align: center; color: #888; font-size: 0.8rem; }
-/* Scrollbar styling cho dropdown */
 .cms-dropdown::-webkit-scrollbar { width: 6px; }
 .cms-dropdown::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
 .cms-dropdown::-webkit-scrollbar-track { background: #f1f1f1; }
 
-/* Overlay to close dropdown */
-.click-overlay { position: fixed; inset: 0; z-index: 50; cursor: default; }
+/* FIX: Overlay giảm z-index xuống 5 */
+.click-overlay { position: fixed; inset: 0; z-index: 5; cursor: default; }
 
 /* Buttons */
 .btn-primary-action { height: 42px; width: 100%; background: #2c3e50; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
 .btn-primary-action:hover { background: #34495e; transform: translateY(-1px); }
 
 /* Legend & Map */
-.legend { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; font-size: 0.9rem; }
+.legend { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; font-size: 0.9rem; flex-wrap: wrap; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
 .dot.available { border: 2px solid #27ae60; background: #fff; }
 .dot.selected { background: #27ae60; }
 .dot.pending { background: #f1c40f; }
 .dot.reserved { background: #e74c3c; opacity: 0.5; }
 .dot.occupied { background: #8e44ad; }
+.dot.maintenance { background: #95a5a6; }
 
 .map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; }
 .table-card { background: #fff; border: 2px solid #eee; border-radius: 10px; padding: 15px; cursor: pointer; transition: 0.2s; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
 .table-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+
+/* Status Styles */
 .table-card.available { border-color: #27ae60; }
-.table-card.selected { border-color: #27ae60; background: #f0fff4; box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.2); }
+.table-card.selected { 
+    border-color: #2ecc71; 
+    background: #e8f5e9; 
+    box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2); 
+    transform: translateY(-3px);
+}
 .table-card.pending { background: #fffcf2; border-color: #f1c40f; opacity: 0.8; cursor: not-allowed; }
 .table-card.reserved { background: #fff5f5; border-color: #e74c3c; opacity: 0.7; cursor: not-allowed; }
 .table-card.occupied { background: #f3e5f5; border-color: #8e44ad; cursor: not-allowed; }
+.table-card.maintenance {
+    background: #f0f2f5;
+    border-color: #bdc3c7;
+    cursor: not-allowed;
+    opacity: 0.9;
+}
 
 .card-header { display: flex; justify-content: space-between; font-weight: 700; color: #555; margin-bottom: 10px; }
 .t-name { font-size: 1rem; }
 .t-cap { font-size: 0.85rem; color: #888; }
 .status-big { text-align: center; font-weight: 600; font-size: 0.9rem; padding: 5px; border-radius: 4px; background: rgba(0,0,0,0.03); }
+
 .table-card.available .status-big { color: #27ae60; }
-.table-card.selected .status-big { color: #27ae60; background: #fff; }
+.table-card.selected .status-big { color: #27ae60; background: #fff; font-weight: 800; }
 .table-card.pending .status-big { color: #f39c12; }
 .table-card.reserved .status-big { color: #c0392b; }
 .table-card.occupied .status-big { color: #8e44ad; }
+.table-card.maintenance .status-big { color: #7f8c8d; }
 
 /* Modals & Animations */
 .footer-action-fixed { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; background: #1a1a1a; color: #fff; padding: 12px 30px; border-radius: 50px; display: flex; align-items: center; gap: 30px; box-shadow: 0 15px 40px rgba(0,0,0,0.3); min-width: 350px; justify-content: space-between; }

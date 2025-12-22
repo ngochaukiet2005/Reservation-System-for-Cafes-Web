@@ -1,5 +1,8 @@
 <template>
   <div class="dashboard-layout" @click="closeUserMenu">
+    
+    <div v-if="showUserMenu || showHourDropdown || showMinuteDropdown || showListHourDropdown || showListMinuteDropdown" class="click-overlay" @click="closeAllDropdowns"></div>
+
     <aside class="sidebar">
       <div class="brand" @click="router.push('/')">
         <img src="../../assets/logo.png" alt="Logo" class="brand-logo" />
@@ -11,7 +14,7 @@
           <span class="icon">📅</span> <span class="text">Quản Lý Đặt Bàn</span>
         </li>
         <li :class="{ active: currentTab === 'TABLES' }" @click="currentTab = 'TABLES'">
-          <span class="icon">🪑</span> <span class="text">Sơ Đồ Bàn (Map)</span>
+          <span class="icon">🪑</span> <span class="text">Sơ Đồ Bàn</span>
         </li>
       </ul>
       <div class="sidebar-footer"><p>© 2025 Trạm Sạc FC</p></div>
@@ -26,11 +29,12 @@
         <div class="user-area" @click.stop="toggleUserMenu">
           <div class="user-info">
             <span class="name">{{ authStore.user?.name || 'Nhân Viên' }}</span>
-            <span class="role-badge">STAFF</span>
           </div>
           <div class="avatar-circle">{{ getUserInitial }}</div>
           <transition name="fade-slide">
             <div v-if="showUserMenu" class="user-dropdown">
+              <div class="menu-item" @click="openEditProfile">✏️ Hồ sơ cá nhân</div>
+              <div class="menu-divider"></div>
               <div class="menu-item logout" @click="handleLogout">🚪 Đăng xuất</div>
             </div>
           </transition>
@@ -52,7 +56,63 @@
                 {{ status.label }} <span class="count-badge" v-if="status.value!=='ALL'">{{ getCountByStatus(status.value) }}</span>
               </button>
             </div>
-            <button class="btn-create" @click="openCreateModal">+ Tạo Đơn Mới</button>
+            <button class="btn-create" @click="switchToMapForCreate">+ Tạo Đơn Mới</button>
+          </div>
+
+          <div class="filters-bar-reservations">
+             <div class="fb-item">
+                <label>Ngày:</label>
+                <input type="date" v-model="listFilter.date" class="date-input">
+             </div>
+             <div class="fb-item">
+                <label>Thời gian:</label>
+                <div class="time-group">
+                    
+                    <div class="custom-select hour-width">
+                        <div class="cms-trigger" @click.stop="toggleListHourDropdown">
+                            <span>
+                                {{ listFilter.hour === '' ? '--' : listFilter.hour.toString().padStart(2, '0') + ' giờ' }}
+                            </span>
+                            <span class="chevron" :class="{ rotate: showListHourDropdown }">▼</span>
+                        </div>
+                        <transition name="fade-slide">
+                            <div v-if="showListHourDropdown" class="cms-dropdown">
+                                <div class="cms-item" :class="{ active: listFilter.hour === '' }" @click="selectListHour('')">--</div>
+                                <div v-for="h in availableListHours" :key="h" 
+                                     class="cms-item" :class="{ active: h === listFilter.hour }"
+                                     @click="selectListHour(h)">
+                                    {{ h.toString().padStart(2, '0') }} giờ
+                                </div>
+                            </div>
+                        </transition>
+                    </div>
+
+                    <span class="colon">:</span>
+
+                    <div class="custom-select minute-width">
+                        <div class="cms-trigger" @click.stop="toggleListMinuteDropdown">
+                            <span>
+                                {{ listFilter.minute === '' ? '--' : listFilter.minute.toString().padStart(2, '0') }}
+                            </span>
+                            <span class="chevron" :class="{ rotate: showListMinuteDropdown }">▼</span>
+                        </div>
+                        <transition name="fade-slide">
+                            <div v-if="showListMinuteDropdown" class="cms-dropdown">
+                                <div class="cms-item" :class="{ active: listFilter.minute === '' }" @click="selectListMinute('')">--</div>
+                                <div v-for="m in 60" :key="m-1" 
+                                     class="cms-item" :class="{ active: (m-1) === listFilter.minute }"
+                                     @click="selectListMinute(m-1)">
+                                    {{ (m-1).toString().padStart(2, '0') }}
+                                </div>
+                            </div>
+                        </transition>
+                    </div>
+                </div>
+             </div>
+             
+             <div class="fb-item" v-if="listFilter.date || listFilter.hour !== '' || listFilter.minute !== ''">
+                 <button class="btn-clear-filter" @click="clearListFilter">✕ Xóa lọc</button>
+             </div>
           </div>
 
           <div class="table-card">
@@ -81,7 +141,7 @@
                   <td>
                     <div class="table-info">
                       <span class="table-badge">{{ item.tableName || 'Chưa chọn' }}</span>
-                      <span class="people-count">👥 {{ item.people }}</span>
+                      <span class="people-count"> & Khách: {{ item.people }}</span>
                     </div>
                   </td>
                   <td>
@@ -97,11 +157,11 @@
                       <button @click="handleApproveCancel(item)" class="btn-sm btn-danger-outline">Đồng ý Hủy</button>
                     </div>
                     <div v-else-if="item.status === 'CONFIRMED'" class="action-group">
-                      <button @click="handleCheckIn(item)" class="btn-sm btn-primary">⬇ Check-in</button>
+                      <button @click="handleCheckIn(item)" class="btn-sm btn-primary">Check-in</button>
                       <button @click="handleReject(item)" class="btn-icon danger" title="Hủy đơn">✕</button>
                     </div>
                     <div v-else-if="item.status === 'OCCUPIED'" class="action-group">
-                      <button @click="handleCheckOut(item)" class="btn-sm btn-success">⬆ Check-out</button>
+                      <button @click="handleCheckOut(item)" class="btn-sm btn-success">Check-out</button>
                     </div>
                   </td>
                 </tr>
@@ -112,40 +172,70 @@
 
         <div v-else class="tab-content">
           <div class="toolbar map-toolbar-custom">
-             <div class="map-filters-styled">
-                <div class="mf-item">
-                    <label>Ngày xem sơ đồ</label>
-                    <input type="date" v-model="mapFilter.date" @change="refreshMap">
-                </div>
-                
-                <div class="mf-item">
+              <div class="map-filters-styled">
+                 <div class="mf-item">
+                    <label>Ngày</label>
+                    <input type="date" v-model="mapFilter.date" :min="today" @change="handleDateChange">
+                 </div>
+                 
+                 <div class="mf-item">
                     <label>Thời gian</label>
                     <div class="time-group">
-                        <select v-model="mapFilter.hour" @change="refreshMap">
-                            <option v-for="h in 24" :key="h-1" :value="h-1">
-                                {{ (h-1).toString().padStart(2,'0') }} giờ
-                            </option>
-                        </select>
+                        <div class="custom-select hour-width">
+                            <div class="cms-trigger" @click.stop="toggleHourDropdown">
+                                <span>{{ mapFilter.hour.toString().padStart(2, '0') }} giờ</span>
+                                <span class="chevron" :class="{ rotate: showHourDropdown }">▼</span>
+                            </div>
+                            <transition name="fade-slide">
+                                <div v-if="showHourDropdown" class="cms-dropdown">
+                                    <div 
+                                        v-for="h in availableHours" :key="h" 
+                                        class="cms-item" :class="{ active: h === mapFilter.hour }"
+                                        @click="selectHour(h)"
+                                    >
+                                        {{ h.toString().padStart(2, '0') }} giờ
+                                    </div>
+                                    <div v-if="availableHours.length === 0" class="cms-empty">Hết giờ</div>
+                                </div>
+                            </transition>
+                        </div>
+                        
                         <span class="colon">:</span>
-                        <select v-model="mapFilter.minute" @change="refreshMap" class="minute-select">
-                            <option v-for="m in 60" :key="m-1" :value="m-1">
-                                {{ (m-1).toString().padStart(2,'0') }}
-                            </option>
-                        </select>
-                    </div>
-                </div>
+                        
+                        <div class="custom-select minute-width">
+                            <div class="cms-trigger" @click.stop="toggleMinuteDropdown">
+                                <span>{{ mapFilter.minute.toString().padStart(2, '0') }}</span>
+                                <span class="chevron" :class="{ rotate: showMinuteDropdown }">▼</span>
+                            </div>
+                            <transition name="fade-slide">
+                                <div v-if="showMinuteDropdown" class="cms-dropdown">
+                                    <div 
+                                        v-for="m in availableMinutes" :key="m" 
+                                        class="cms-item" :class="{ active: m === mapFilter.minute }"
+                                        @click="selectMinute(m)"
+                                    >
+                                        {{ m.toString().padStart(2, '0') }}
+                                    </div>
+                                    <div v-if="availableMinutes.length === 0" class="cms-empty">Hết giờ</div>
+                                </div>
+                            </transition>
+                        </div>
 
-                <div class="mf-item action">
+                    </div>
+                 </div>
+
+                 <div class="mf-item action">
                     <button class="btn-dark-flat" @click="resetToNow">HIỆN TẠI</button>
-                </div>
-             </div>
-             
-             <div class="map-legend">
+                 </div>
+              </div>
+              
+              <div class="map-legend">
                 <span><i class="dot available"></i> Trống</span>
                 <span><i class="dot pending"></i> Chờ duyệt</span>
                 <span><i class="dot reserved"></i> Đã đặt</span>
                 <span><i class="dot occupied"></i> Đang có khách</span>
-             </div>
+                <span><i class="dot maintenance"></i> Bảo trì</span>
+              </div>
           </div>
 
           <div class="staff-map-grid">
@@ -180,23 +270,49 @@
       @close="closeModal"
     />
 
+    <EditProfileModal 
+      v-if="showEditProfileModal"
+      :isVisible="showEditProfileModal"
+      @close="showEditProfileModal = false"
+    />
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue';
+import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { authStore } from '../../store/authStore';
 import { reservationStore } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
+import EditProfileModal from '../../components/EditProfileModal.vue';
 
 const router = useRouter();
-const currentTab = ref('RESERVATIONS');
-const showUserMenu = ref(false);
-const showCreateModal = ref(false);
 
-// --- TAB 1 LOGIC ---
+// --- STATE QUẢN LÝ TAB ---
+const savedTab = localStorage.getItem('staffCurrentTab');
+const currentTab = ref(savedTab && ['RESERVATIONS', 'TABLES'].includes(savedTab) ? savedTab : 'RESERVATIONS');
+
+watch(currentTab, (newVal) => {
+    localStorage.setItem('staffCurrentTab', newVal);
+});
+
+// --- DROPDOWN STATE ---
+const showUserMenu = ref(false);
+
+// Map Tab Dropdowns
+const showHourDropdown = ref(false);
+const showMinuteDropdown = ref(false);
+
+// List Tab Dropdowns
+const showListHourDropdown = ref(false);
+const showListMinuteDropdown = ref(false);
+
+const showCreateModal = ref(false);
+const showEditProfileModal = ref(false);
+
+// --- TAB 1: RESERVATION LIST LOGIC ---
 const searchKeyword = ref('');
 const filterStatus = ref('ALL');
 const statusTabs = [
@@ -208,16 +324,67 @@ const statusTabs = [
   { label: 'Lịch sử', value: 'HISTORY' } 
 ];
 
+// List Filter State
+const listFilter = reactive({
+    date: '',
+    hour: '' as string | number,
+    minute: '' as string | number
+});
+
+const availableListHours = computed(() => {
+    const arr = [];
+    for(let i=8; i<=22; i++) arr.push(i);
+    return arr;
+});
+
+const clearListFilter = () => {
+    listFilter.date = '';
+    listFilter.hour = '';
+    listFilter.minute = '';
+};
+
+// Actions cho List Dropdown
+const toggleListHourDropdown = () => { showListHourDropdown.value = !showListHourDropdown.value; showListMinuteDropdown.value = false; showUserMenu.value = false; };
+const toggleListMinuteDropdown = () => { showListMinuteDropdown.value = !showListMinuteDropdown.value; showListHourDropdown.value = false; showUserMenu.value = false; };
+const selectListHour = (h: string | number) => { listFilter.hour = h; showListHourDropdown.value = false; };
+const selectListMinute = (m: string | number) => { listFilter.minute = m; showListMinuteDropdown.value = false; };
+
+const switchToMapForCreate = () => {
+    currentTab.value = 'TABLES';
+    Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Hãy chọn một bàn trống trên sơ đồ', showConfirmButton: false, timer: 3000 });
+};
+
+// Computed Filtered List
 const filteredReservations = computed(() => {
   let data = reservationStore.reservations;
+
   if (filterStatus.value !== 'ALL') {
     if (filterStatus.value === 'HISTORY') data = data.filter(r => ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(r.status));
     else data = data.filter(r => r.status === filterStatus.value);
   }
+
   if (searchKeyword.value) {
     const k = searchKeyword.value.toLowerCase();
     data = data.filter(r => r.guestName.toLowerCase().includes(k) || r.phone.includes(k));
   }
+
+  if (listFilter.date || listFilter.hour !== '' || listFilter.minute !== '') {
+      data = data.filter(r => {
+          const rDate = new Date(r.time);
+          if (listFilter.date) {
+              const dStr = rDate.toISOString().split('T')[0];
+              if (dStr !== listFilter.date) return false;
+          }
+          if (listFilter.hour !== '') {
+              if (rDate.getHours() !== Number(listFilter.hour)) return false;
+          }
+          if (listFilter.minute !== '') {
+              if (rDate.getMinutes() !== Number(listFilter.minute)) return false;
+          }
+          return true;
+      });
+  }
+
   return data.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 });
 
@@ -230,12 +397,70 @@ const handleCheckOut = async (item: any) => { await reservationStore.checkOutRes
 // --- TAB 2 LOGIC: MAP ---
 const selectedTableForAction = ref<any>(null);
 const staffInitData = reactive({ date: '', time: '', people: 2 });
+const today = new Date().toISOString().split('T')[0];
+const OPEN_HOUR = 8;
+const CLOSE_HOUR = 22;
 
 const mapFilter = reactive({
-    date: new Date().toISOString().split('T')[0],
+    date: today,
     hour: new Date().getHours(),
     minute: new Date().getMinutes()
 });
+
+const currentSystemTime = reactive({
+    hour: new Date().getHours(),
+    minute: new Date().getMinutes()
+});
+
+setInterval(() => {
+    const now = new Date();
+    currentSystemTime.hour = now.getHours();
+    currentSystemTime.minute = now.getMinutes();
+}, 60000);
+
+const availableHours = computed(() => {
+    const hours = [];
+    const isToday = mapFilter.date === today;
+    let start = isToday ? Math.max(currentSystemTime.hour, OPEN_HOUR) : OPEN_HOUR;
+    for (let h = start; h <= CLOSE_HOUR; h++) hours.push(h);
+    return hours;
+});
+
+const availableMinutes = computed(() => {
+    const minutes = [];
+    const isToday = mapFilter.date === today;
+    const isCurrentHour = isToday && (mapFilter.hour === currentSystemTime.hour);
+    let startMinute = isCurrentHour ? currentSystemTime.minute : 0;
+    for (let m = startMinute; m < 60; m++) minutes.push(m);
+    return minutes;
+});
+
+watch(availableHours, (newVal) => {
+    if (newVal.length > 0 && !newVal.includes(mapFilter.hour)) mapFilter.hour = newVal[0];
+});
+watch(availableMinutes, (newVal) => {
+    if (newVal.length > 0 && !newVal.includes(mapFilter.minute)) mapFilter.minute = newVal[0];
+});
+
+// Dropdown Management
+const closeAllDropdowns = () => {
+    showUserMenu.value = false;
+    showHourDropdown.value = false;
+    showMinuteDropdown.value = false;
+    showListHourDropdown.value = false;
+    showListMinuteDropdown.value = false;
+};
+const toggleUserMenu = () => { 
+    showUserMenu.value = !showUserMenu.value; 
+    showHourDropdown.value = false; showMinuteDropdown.value = false; 
+    showListHourDropdown.value = false; showListMinuteDropdown.value = false;
+};
+const toggleHourDropdown = () => { showHourDropdown.value = !showHourDropdown.value; showMinuteDropdown.value = false; showUserMenu.value = false; };
+const toggleMinuteDropdown = () => { showMinuteDropdown.value = !showMinuteDropdown.value; showHourDropdown.value = false; showUserMenu.value = false; };
+const selectHour = (h: number) => { mapFilter.hour = h; showHourDropdown.value = false; refreshMap(); };
+const selectMinute = (m: number) => { mapFilter.minute = m; showMinuteDropdown.value = false; refreshMap(); };
+
+const handleDateChange = () => { refreshMap(); };
 
 const refreshMap = () => {
    const t = `${mapFilter.hour.toString().padStart(2,'0')}:${mapFilter.minute.toString().padStart(2,'0')}`;
@@ -244,26 +469,46 @@ const refreshMap = () => {
 
 const resetToNow = () => {
     const now = new Date();
-    mapFilter.date = now.toISOString().split('T')[0];
-    mapFilter.hour = now.getHours();
-    mapFilter.minute = now.getMinutes();
+    if (now.getHours() >= CLOSE_HOUR) {
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        mapFilter.date = tomorrow.toISOString().split('T')[0];
+        mapFilter.hour = OPEN_HOUR;
+        mapFilter.minute = 0;
+    } else {
+        mapFilter.date = today;
+        mapFilter.hour = Math.max(now.getHours(), OPEN_HOUR);
+        mapFilter.minute = now.getMinutes();
+    }
     refreshMap();
 };
 
 const handleTableClick = async (table: any) => {
+   if (table.status === 'MAINTENANCE') {
+       Swal.fire({ icon: 'warning', title: 'Bàn đang bảo trì', text: 'Không thể thao tác trên bàn này.' });
+       return;
+   }
+
    selectedTableForAction.value = table;
    const dateStr = mapFilter.date;
    const timeStr = `${mapFilter.hour.toString().padStart(2,'0')}:${mapFilter.minute.toString().padStart(2,'0')}`;
 
    if (table.status === 'AVAILABLE') {
        const { isConfirmed, value } = await Swal.fire({
-          title: `Bàn ${table.name}`, text: 'Bàn Trống. Bạn muốn làm gì?',
+          title: `Thao tác: ${table.name}`,
+          text: 'Bàn đang trống. Vui lòng chọn hành động:',
           showDenyButton: true, showCancelButton: true,
-          confirmButtonText: '⚡ Khách vào luôn (Check-in)', denyButtonText: '📅 Đặt trước (Booking)', cancelButtonText: 'Đóng'
+          confirmButtonText: 'Khách Vào Ngay', confirmButtonColor: '#27ae60',
+          denyButtonText: 'Tạo Đặt Trước', denyButtonColor: '#3498db',
+          cancelButtonText: 'Đóng', cancelButtonColor: '#95a5a6'
        });
 
        if (isConfirmed) { 
-           const { value: guestName } = await Swal.fire({ input: 'text', title: 'Tên khách', inputValue: 'Khách lẻ' });
+           const { value: guestName } = await Swal.fire({ 
+               input: 'text', title: 'Nhập Tên Khách Hàng', inputValue: 'Khách vãng lai',
+               confirmButtonText: 'Xác Nhận', confirmButtonColor: '#27ae60',
+               showCancelButton: true, cancelButtonText: 'Hủy'
+           });
            if (guestName) {
                await reservationStore.createReservation({
                    guestName, phone: 'N/A', people: table.capacity,
@@ -271,7 +516,7 @@ const handleTableClick = async (table: any) => {
                    tableId: table.id, tableName: table.name,
                    isAdmin: true, initialStatus: 'OCCUPIED'
                });
-               Swal.fire('Thành công', 'Bàn đã chuyển sang CÓ KHÁCH', 'success');
+               Swal.fire({ icon: 'success', title: 'Thành công', text: 'Bàn đã chuyển trạng thái CÓ KHÁCH', timer: 1500, showConfirmButton: false });
            }
        } else if (value === false) { 
            staffInitData.date = dateStr; staffInitData.time = timeStr;
@@ -281,20 +526,36 @@ const handleTableClick = async (table: any) => {
    else if (table.status === 'PENDING') {
        const booking = reservationStore.reservations.find(r => r.tableId === table.id && r.status === 'PENDING');
        if (booking) {
-           const res = await Swal.fire({ title: 'Duyệt đơn?', html: `Khách: <b>${booking.guestName}</b>`, showCancelButton: true, confirmButtonText: 'Duyệt', cancelButtonText: 'Từ chối' });
-           if (res.isConfirmed) await reservationStore.approveReservation(booking.id);
-           else if (res.dismiss === Swal.DismissReason.cancel) await reservationStore.cancelReservation(booking.id, 'Staff từ chối qua map');
+           const res = await Swal.fire({ 
+               title: 'Xử lý đơn chờ', html: `Khách: <strong>${booking.guestName}</strong><br>SĐT: ${booking.phone}`, 
+               showCancelButton: true, confirmButtonText: 'Duyệt Đơn', confirmButtonColor: '#27ae60',
+               cancelButtonText: 'Từ Chối', cancelButtonColor: '#e74c3c'
+           });
+           if (res.isConfirmed) {
+               await reservationStore.approveReservation(booking.id);
+               Swal.fire({ icon: 'success', title: 'Đã duyệt', timer: 1500, showConfirmButton: false });
+           } else if (res.dismiss === Swal.DismissReason.cancel) {
+               await reservationStore.cancelReservation(booking.id, 'Staff từ chối qua map');
+           }
        }
    }
    else if (table.status === 'OCCUPIED') {
        const booking = reservationStore.reservations.find(r => r.tableId === table.id && r.status === 'OCCUPIED');
-       const res = await Swal.fire({ title: 'Thanh toán?', text: `Khách: ${booking?.guestName || 'Unknown'}`, showCancelButton: true, confirmButtonText: 'Check-out' });
-       if (res.isConfirmed && booking) await reservationStore.checkOutReservation(booking.id);
+       const res = await Swal.fire({ 
+           title: 'Thanh Toán & Trả Bàn', text: `Khách: ${booking?.guestName || 'Unknown'}`, 
+           showCancelButton: true, confirmButtonText: 'Xác Nhận Trả Bàn', confirmButtonColor: '#f39c12' 
+       });
+       if (res.isConfirmed && booking) {
+           await reservationStore.checkOutReservation(booking.id);
+           Swal.fire({ icon: 'success', title: 'Hoàn tất', text: 'Bàn đã trở về trạng thái Trống', timer: 1500, showConfirmButton: false });
+       }
    }
 };
 
 const openCreateModal = () => { selectedTableForAction.value = null; showCreateModal.value = true; };
 const closeModal = () => { showCreateModal.value = false; selectedTableForAction.value = null; };
+const openEditProfile = () => { showEditProfileModal.value = true; showUserMenu.value = false; };
+
 const handleStaffCreateReservation = async (formData: any) => {
     await reservationStore.createReservation({
         ...formData, reservation_time: `${formData.date}T${formData.time}`,
@@ -312,11 +573,17 @@ const getStatusLabel = (s:string) => ({PENDING:'Chờ duyệt',CONFIRMED:'Sắp 
 const getStatusLabelMap = (s: string) => ({ AVAILABLE: 'Trống', PENDING: 'Chờ duyệt', RESERVED: 'Có khách đặt', OCCUPIED: 'Đang có khách', MAINTENANCE: 'Bảo trì' }[s] || s);
 const formatTimeOnly = (iso: string) => new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 const formatDateOnly = (iso: string) => new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-const toggleUserMenu = () => { showUserMenu.value = !showUserMenu.value; };
-const closeUserMenu = () => { showUserMenu.value = false; };
-const handleLogout = () => { authStore.logout(); router.push('/'); };
+const handleLogout = () => { 
+    authStore.logout(); 
+    localStorage.removeItem('staffCurrentTab'); 
+    router.push('/'); 
+    closeUserMenu(); 
+};
 
-onMounted(() => { reservationStore.fetchReservations(); refreshMap(); });
+onMounted(() => { 
+    reservationStore.fetchReservations(); 
+    resetToNow();
+});
 </script>
 
 <style scoped>
@@ -341,11 +608,17 @@ onMounted(() => { reservationStore.fetchReservations(); refreshMap(); });
 .date-today { font-size: 0.85rem; color: #7f8c8d; text-transform: capitalize; }
 .user-area { display: flex; align-items: center; gap: 12px; cursor: pointer; position: relative; }
 .user-info { text-align: right; }
-.role-badge { font-size: 0.65rem; background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #7f8c8d; }
+
 .avatar-circle { width: 40px; height: 40px; background: #34495e; color: #fff; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
-.user-dropdown { position: absolute; top: 55px; right: 0; width: 150px; background: #fff; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); z-index: 100; border: 1px solid #eee; padding: 10px; }
-.menu-item { padding: 8px 10px; cursor: pointer; color: #555; }
-.menu-item:hover { background: #f9f9f9; }
+.user-dropdown { position: absolute; top: 55px; right: 0; width: 180px; background: #fff; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); z-index: 100; border: 1px solid #eee; padding: 10px; }
+.menu-item { padding: 10px 12px; cursor: pointer; color: #555; font-size: 0.9rem; transition: background 0.2s; border-radius: 4px; }
+.menu-item:hover { background: #f9f9f9; color: #a67c52; }
+.menu-divider { height: 1px; background: #eee; margin: 5px 0; }
+.menu-item.logout { color: #c0392b; }
+.menu-item.logout:hover { background: #fdedec; }
+
+/* Overlay */
+.click-overlay { position: fixed; inset: 0; z-index: 90; cursor: default; }
 
 .content-body { padding: 30px; overflow-y: auto; flex: 1; }
 .toolbar { display: flex; gap: 15px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
@@ -356,6 +629,15 @@ onMounted(() => { reservationStore.fetchReservations(); refreshMap(); });
 .filter-tab.active { background: #fff; color: #333; }
 .count-badge { background: #95a5a6; color: #fff; font-size: 0.7rem; padding: 1px 5px; border-radius: 10px; margin-left: 5px; }
 .btn-create { margin-left: auto; background: #27ae60; color: #fff; border: none; padding: 0 20px; height: 42px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+/* NEW: FILTERS BAR FOR LIST (UPDATED CSS: align-items: flex-end) */
+.filters-bar-reservations { display: flex; gap: 20px; background: #fff; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; align-items: flex-end; box-shadow: 0 2px 10px rgba(0,0,0,0.03); flex-wrap: wrap; }
+.fb-item { display: flex; flex-direction: column; }
+.fb-item label { font-size: 0.75rem; font-weight: 700; color: #555; margin-bottom: 5px; text-transform: uppercase; }
+.date-input { height: 42px; padding: 0 10px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 0.9rem; outline: none; box-sizing: border-box; }
+.btn-clear-filter { align-self: flex-end; height: 42px; padding: 0 15px; border: 1px solid #e74c3c; color: #e74c3c; background: transparent; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+.btn-clear-filter:hover { background: #e74c3c; color: #fff; }
+
 .table-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); overflow: hidden; }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th { background: #f8f9fa; text-align: left; padding: 15px; font-size: 0.8rem; text-transform: uppercase; color: #7f8c8d; border-bottom: 2px solid #eee; }
@@ -369,24 +651,24 @@ onMounted(() => { reservationStore.fetchReservations(); refreshMap(); });
 .status-badge.cancelled { background: #f8d7da; color: #721c24; }
 .note-text { font-size: 0.75rem; color: #c0392b; margin-top: 4px; font-style: italic; max-width: 150px; }
 
-/* MAP STYLES UPDATE */
+/* MAP STYLES */
 .map-toolbar-custom { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
 .map-filters-styled { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
 .mf-item { display: flex; flex-direction: column; }
 .mf-item label { font-size: 0.75rem; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase; }
-.mf-item input, .mf-item select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 0.9rem; outline: none; }
-.time-group { display: flex; align-items: center; gap: 5px; }
-.minute-select { width: 70px; }
+.mf-item input, .mf-item select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 0.9rem; outline: none; height: 42px; box-sizing: border-box; }
+.time-group { display: flex; align-items: center; gap: 8px; }
 .colon { font-weight: bold; }
-.btn-dark-flat { height: 38px; padding: 0 20px; background: #34495e; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; text-transform: uppercase; font-size: 0.85rem; }
+.btn-dark-flat { height: 42px; padding: 0 20px; background: #34495e; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; text-transform: uppercase; font-size: 0.85rem; }
 .btn-dark-flat:hover { background: #2c3e50; }
 .map-legend { display: flex; gap: 15px; font-size: 0.85rem; }
-
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
 .dot.available { background: #fff; border: 2px solid #27ae60; }
 .dot.pending { background: #f1c40f; }
 .dot.reserved { background: #e74c3c; }
 .dot.occupied { background: #8e44ad; }
+.dot.maintenance { background: #95a5a6; }
+
 .staff-map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; padding-bottom: 50px; }
 .staff-table-card { background: #fff; border: 2px solid #eee; border-radius: 10px; padding: 15px; cursor: pointer; transition: 0.2s; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
 .staff-table-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
@@ -394,12 +676,31 @@ onMounted(() => { reservationStore.fetchReservations(); refreshMap(); });
 .staff-table-card.pending { background: #fffcf2; border-color: #f1c40f; animation: pulse 2s infinite; }
 .staff-table-card.reserved { background: #fff5f5; border-color: #e74c3c; }
 .staff-table-card.occupied { background: #f3e5f5; border-color: #8e44ad; }
+.staff-table-card.maintenance { background: #f8f9fa; border-color: #bdc3c7; opacity: 0.8; cursor: not-allowed; }
+
 .table-header { display: flex; justify-content: space-between; font-weight: 700; color: #555; margin-bottom: 10px; }
 .status-big { text-align: center; font-weight: 600; font-size: 0.9rem; padding: 5px; border-radius: 4px; background: rgba(0,0,0,0.03); }
 .staff-table-card.available .status-big { color: #27ae60; }
 .staff-table-card.pending .status-big { color: #f39c12; }
 .staff-table-card.reserved .status-big { color: #c0392b; }
 .staff-table-card.occupied .status-big { color: #8e44ad; }
+.staff-table-card.maintenance .status-big { color: #7f8c8d; }
+
+/* Custom Dropdown CSS */
+.custom-select { position: relative; height: 42px; }
+.custom-select.hour-width { width: 100px; }
+.custom-select.minute-width { width: 80px; }
+.cms-trigger { height: 100%; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 0 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 0.9rem; transition: border-color 0.2s; box-sizing: border-box; }
+.cms-trigger:hover { border-color: #a67c52; }
+.chevron { font-size: 0.6rem; color: #888; transition: transform 0.2s; }
+.chevron.rotate { transform: rotate(180deg); }
+.cms-dropdown { position: absolute; top: 105%; left: 0; width: 100%; background: white; border: 1px solid #ddd; border-radius: 6px; z-index: 100; max-height: 200px; overflow-y: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.cms-item { padding: 10px; text-align: center; cursor: pointer; transition: 0.1s; font-size: 0.9rem; border-bottom: 1px solid #f9f9f9; }
+.cms-item:hover { background: #f5f5f5; color: #a67c52; }
+.cms-item.active { background: #e3f2fd; color: #1565c0; font-weight: bold; }
+.cms-empty { padding: 10px; text-align: center; color: #888; font-size: 0.8rem; }
+.cms-dropdown::-webkit-scrollbar { width: 4px; }
+.cms-dropdown::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
 
 .action-group { display: flex; gap: 5px; justify-content: flex-end; }
 .btn-icon { width: 30px; height: 30px; border-radius: 4px; border: none; cursor: pointer; display: grid; place-items: center; }
@@ -410,4 +711,6 @@ onMounted(() => { reservationStore.fetchReservations(); refreshMap(); });
 .btn-success { background: #27ae60; color: #fff; }
 .btn-danger-outline { border: 1px solid #e74c3c; background: #fff; color: #e74c3c; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(241, 196, 15, 0); } 100% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0); } }
+.fade-slide-enter-active, .fade-slide-leave-active { transition: all 0.2s ease; }
+.fade-slide-enter-from, .fade-slide-leave-to { opacity: 0; transform: translateY(-5px); }
 </style>

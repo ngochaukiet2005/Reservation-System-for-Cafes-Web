@@ -38,7 +38,10 @@ const MOCK_TABLES_DATA: Table[] = [
   { id: 113, name: 'Bàn 13', capacity: 4, status: 'AVAILABLE', type: 'Outdoor' },
   { id: 114, name: 'Bàn 14', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
   { id: 115, name: 'Bàn 15', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
+  
+  // UPDATE: Đặt bàn 16 ở trạng thái bảo trì để test giao diện
   { id: 116, name: 'Bàn 16', capacity: 4, status: 'MAINTENANCE', type: 'Outdoor' },
+  
   { id: 117, name: 'Bàn 17', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
   { id: 118, name: 'Bàn 18', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
   { id: 119, name: 'Bàn 19', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
@@ -77,6 +80,7 @@ export const reservationStore = reactive({
         // Reset về mặc định
         const currentTables = MOCK_TABLES_DATA.map(t => ({ 
           ...t, 
+          // Giữ nguyên trạng thái bảo trì nếu có
           status: t.status === 'MAINTENANCE' ? 'MAINTENANCE' : 'AVAILABLE' 
         }));
 
@@ -94,10 +98,12 @@ export const reservationStore = reactive({
           if (diffMinutes < 60) { 
             const tableIndex = currentTables.findIndex(t => t.id === res.tableId);
             if (tableIndex !== -1) {
-              if (res.status === 'OCCUPIED') currentTables[tableIndex].status = 'OCCUPIED';
-              else if (res.status === 'PENDING') currentTables[tableIndex].status = 'PENDING';
-              // Cả REQUEST_CANCEL cũng coi là RESERVED cho đến khi Staff xác nhận hủy
-              else currentTables[tableIndex].status = 'RESERVED';
+              // Nếu bàn đang bảo trì thì không ghi đè trạng thái đặt bàn
+              if (currentTables[tableIndex].status !== 'MAINTENANCE') {
+                  if (res.status === 'OCCUPIED') currentTables[tableIndex].status = 'OCCUPIED';
+                  else if (res.status === 'PENDING') currentTables[tableIndex].status = 'PENDING';
+                  else currentTables[tableIndex].status = 'RESERVED';
+              }
             }
           }
         });
@@ -138,13 +144,11 @@ export const reservationStore = reactive({
   async cancelReservation(id: number, reason: string = '') {
      const target = this.reservations.find(r => r.id === id);
      if (target) {
-        // Nếu đang PENDING hoặc REQUEST_CANCEL -> Hủy luôn -> Trả bàn
         if (['PENDING', 'REQUEST_CANCEL'].includes(target.status)) {
             target.status = 'CANCELLED';
             target.cancellationReason = reason;
             this.updateTableStatusOnUI(target.tableId, 'AVAILABLE');
         } else {
-            // Nếu đã CONFIRMED mà Staff hủy -> Vẫn tính là hủy
             target.status = 'CANCELLED'; 
             target.cancellationReason = reason;
             this.updateTableStatusOnUI(target.tableId, 'AVAILABLE');
