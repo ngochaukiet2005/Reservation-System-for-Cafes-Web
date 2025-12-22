@@ -1,5 +1,8 @@
 <template>
   <div class="page-container">
+    
+    <div v-if="showHourDropdown || showMinuteDropdown" class="click-overlay" @click="closeAllDropdowns"></div>
+
     <div class="header">
       <h2>📜 Lịch Sử Đặt Bàn</h2>
       <button class="btn-create" @click="$router.push('/reservation')">+ Đặt bàn mới</button>
@@ -21,20 +24,72 @@
         <label>Ngày đặt:</label>
         <input type="date" v-model="filterDate">
       </div>
+      
       <div class="filter-group">
-        <label>Giờ:</label>
+        <label>Thời gian:</label>
         <div class="time-filter-wrapper">
-            <select v-model="filterHour" class="time-select">
-                <option value="">--</option>
-                <option v-for="h in 24" :key="h-1" :value="h-1">{{ (h-1).toString().padStart(2,'0') }}</option>
-            </select>
+            
+            <div class="custom-select hour-width">
+                <div class="cms-trigger" @click="toggleHourDropdown">
+                    <span>
+                        {{ filterHour === '' ? '--' : filterHour.toString().padStart(2, '0') + ' giờ' }}
+                    </span>
+                    <span class="chevron" :class="{ rotate: showHourDropdown }">▼</span>
+                </div>
+                
+                <transition name="fade-slide">
+                    <div v-if="showHourDropdown" class="cms-dropdown">
+                        <div class="cms-item" :class="{ active: filterHour === '' }" @click="selectHour('')">
+                            --
+                        </div>
+                        <div 
+                            v-for="h in availableHours" 
+                            :key="h" 
+                            class="cms-item" 
+                            :class="{ active: h === filterHour }"
+                            @click="selectHour(h)"
+                        >
+                            {{ h.toString().padStart(2, '0') }} giờ
+                        </div>
+                    </div>
+                </transition>
+            </div>
+            
             <span class="colon">:</span>
-            <select v-model="filterMinute" class="time-select">
-                <option value="">--</option>
-                <option v-for="m in 60" :key="m-1" :value="m-1">{{ (m-1).toString().padStart(2,'0') }}</option>
-            </select>
+            
+            <div class="custom-select minute-width">
+                <div class="cms-trigger" @click="toggleMinuteDropdown">
+                    <span>
+                        {{ filterMinute === '' ? '--' : filterMinute.toString().padStart(2, '0') }}
+                    </span>
+                    <span class="chevron" :class="{ rotate: showMinuteDropdown }">▼</span>
+                </div>
+                
+                <transition name="fade-slide">
+                    <div v-if="showMinuteDropdown" class="cms-dropdown">
+                        <div class="cms-item" :class="{ active: filterMinute === '' }" @click="selectMinute('')">
+                            --
+                        </div>
+                        <div 
+                            v-for="m in availableMinutes" 
+                            :key="m" 
+                            class="cms-item" 
+                            :class="{ active: m === filterMinute }"
+                            @click="selectMinute(m)"
+                        >
+                            {{ m.toString().padStart(2, '0') }}
+                        </div>
+                    </div>
+                </transition>
+            </div>
+
         </div>
       </div>
+
+      <div class="filter-group" v-if="filterDate || filterHour !== '' || filterMinute !== ''">
+          <button class="btn-clear-filter" @click="clearFilters">✕ Xóa lọc</button>
+      </div>
+
     </div>
     
     <div v-if="reservationStore.isLoading" class="loading-state">
@@ -145,9 +200,28 @@ import Swal from 'sweetalert2';
 // State
 const filterStatus = ref('');
 const filterDate = ref('');
-// State mới cho bộ lọc giờ
+// State lọc giờ/phút
 const filterHour = ref<number | string>('');
 const filterMinute = ref<number | string>('');
+
+// State custom dropdown
+const showMinuteDropdown = ref(false);
+const showHourDropdown = ref(false);
+
+const OPEN_HOUR = 8;
+const CLOSE_HOUR = 22;
+
+const availableHours = computed(() => {
+    const hours = [];
+    for (let h = OPEN_HOUR; h <= CLOSE_HOUR; h++) hours.push(h);
+    return hours;
+});
+
+const availableMinutes = computed(() => {
+    const minutes = [];
+    for (let m = 0; m < 60; m++) minutes.push(m);
+    return minutes;
+});
 
 // Modal Hủy
 const showCancelModal = ref(false);
@@ -160,23 +234,19 @@ const selectedDetailRes = ref<any>(null);
 
 const filteredReservations = computed(() => {
   return reservationStore.reservations.filter(res => {
-    // 1. Lọc trạng thái
     if (filterStatus.value && res.status !== filterStatus.value) return false;
     
     const resObj = new Date(res.time);
 
-    // 2. Lọc ngày
     if (filterDate.value) {
       const resDate = resObj.toISOString().split('T')[0];
       if (resDate !== filterDate.value) return false;
     }
 
-    // 3. Lọc Giờ
     if (filterHour.value !== '') {
         if (resObj.getHours() !== Number(filterHour.value)) return false;
     }
 
-    // 4. Lọc Phút
     if (filterMinute.value !== '') {
         if (resObj.getMinutes() !== Number(filterMinute.value)) return false;
     }
@@ -184,6 +254,47 @@ const filteredReservations = computed(() => {
     return true;
   });
 });
+
+// --- Actions Dropdown ---
+const closeAllDropdowns = () => {
+    showMinuteDropdown.value = false;
+    showHourDropdown.value = false;
+};
+
+const toggleHourDropdown = () => {
+    if (showHourDropdown.value) {
+        showHourDropdown.value = false;
+    } else {
+        showHourDropdown.value = true;
+        showMinuteDropdown.value = false; 
+    }
+};
+
+const toggleMinuteDropdown = () => {
+    if (showMinuteDropdown.value) {
+        showMinuteDropdown.value = false;
+    } else {
+        showMinuteDropdown.value = true;
+        showHourDropdown.value = false;
+    }
+};
+
+const selectHour = (h: number | string) => {
+    filterHour.value = h;
+    showHourDropdown.value = false;
+};
+
+const selectMinute = (m: number | string) => {
+    filterMinute.value = m;
+    showMinuteDropdown.value = false;
+};
+
+// NEW: Action xóa bộ lọc
+const clearFilters = () => {
+    filterDate.value = '';
+    filterHour.value = '';
+    filterMinute.value = '';
+};
 
 const formatDate = (isoStr: string) => {
   if(!isoStr) return '';
@@ -195,14 +306,12 @@ const formatTime = (isoStr: string) => {
   return new Date(isoStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 };
 
-// --- TÍNH NĂNG XEM CHI TIẾT ---
 const viewDetails = (res: any) => { selectedDetailRes.value = res; showDetailModal.value = true; };
 
 const showRejectReason = (reason: string) => {
   Swal.fire({ icon: 'info', title: 'Lý do từ chối hủy', text: reason, confirmButtonColor: '#2c3e50' });
 };
 
-// --- LOGIC XỬ LÝ HỦY ---
 const onCancelClick = async (res: any) => {
   const reservationTime = new Date(res.time).getTime();
   const now = new Date().getTime();
@@ -252,12 +361,67 @@ onMounted(() => { reservationStore.fetchReservations(); });
 .header h2 { margin: 0; color: #2c3e50; font-size: 24px; }
 
 /* Filter Styles */
-.filters-bar { display: flex; gap: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #eee; flex-wrap: wrap; }
-.filter-group { display: flex; align-items: center; gap: 10px; }
-.filter-group select, .filter-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
+/* Đã sửa align-items thành flex-end để nút xóa lọc nằm dưới cùng */
+.filters-bar { display: flex; gap: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #eee; flex-wrap: wrap; align-items: flex-end; }
+.filter-group { display: flex; flex-direction: column; gap: 5px; }
+.filter-group label { font-size: 0.85rem; font-weight: 600; color: #555; }
+.filter-group select, .filter-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; outline: none; height: 38px; box-sizing: border-box; }
 .time-filter-wrapper { display: flex; align-items: center; gap: 5px; }
-.time-select { width: 60px; }
 .colon { font-weight: bold; }
+
+/* Nút xóa lọc */
+.btn-clear-filter { height: 38px; padding: 0 15px; border: 1px solid #e74c3c; color: #e74c3c; background: transparent; border-radius: 4px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+.btn-clear-filter:hover { background: #e74c3c; color: #fff; }
+
+/* --- CUSTOM SELECT CSS (COMMON) --- */
+.custom-select {
+    position: relative;
+    height: 38px;
+}
+.custom-select.hour-width { width: 100px; }
+.custom-select.minute-width { width: 70px; }
+
+.cms-trigger {
+    height: 100%;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+.cms-trigger:hover { border-color: #a67c52; }
+.chevron { font-size: 0.6rem; color: #888; transition: transform 0.2s; }
+.chevron.rotate { transform: rotate(180deg); }
+
+.cms-dropdown {
+    position: absolute;
+    top: 105%;
+    left: 0;
+    width: 100%;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    z-index: 10; 
+    max-height: 200px; 
+    overflow-y: auto;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+.cms-item { padding: 8px; text-align: center; cursor: pointer; transition: 0.1s; font-size: 0.9rem; border-bottom: 1px solid #f9f9f9; }
+.cms-item:hover { background: #f5f5f5; color: #a67c52; }
+.cms-item.active { background: #e3f2fd; color: #1565c0; font-weight: bold; }
+
+/* Scrollbar styling */
+.cms-dropdown::-webkit-scrollbar { width: 4px; }
+.cms-dropdown::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+/* Overlay */
+.click-overlay { position: fixed; inset: 0; z-index: 5; cursor: default; }
 
 /* Buttons */
 .btn-create { background-color: #d4a373; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; }
@@ -267,7 +431,7 @@ onMounted(() => { reservationStore.fetchReservations(); });
 .btn-cancel:hover { background-color: #fecaca; }
 
 /* Table Styles */
-.table-container { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #eee; }
+.table-container { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #eee; position: relative; z-index: 1; }
 .history-table { width: 100%; border-collapse: collapse; min-width: 600px; }
 .history-table th { background-color: #f8f9fa; color: #6c757d; font-weight: 600; text-align: left; padding: 15px; border-bottom: 2px solid #eee; }
 .history-table td { padding: 15px; border-bottom: 1px solid #eee; color: #333; vertical-align: middle; }
@@ -304,4 +468,6 @@ onMounted(() => { reservationStore.fetchReservations(); });
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-slide-enter-active, .fade-slide-leave-active { transition: all 0.2s ease; }
+.fade-slide-enter-from, .fade-slide-leave-to { opacity: 0; transform: translateY(-5px); }
 </style>
