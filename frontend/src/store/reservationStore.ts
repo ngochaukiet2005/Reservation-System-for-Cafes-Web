@@ -4,7 +4,7 @@ export interface Table {
   id: number;
   name: string;
   capacity: number;
-  status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE';
+  status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE' | 'PENDING';
   type: 'Indoor' | 'Outdoor' | 'VIP';
 }
 
@@ -16,15 +16,13 @@ export interface Reservation {
   people: number;
   tableId: number | null;
   tableName?: string;
-  // [CẬP NHẬT] Thêm trạng thái REQUEST_CANCEL
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'REQUEST_CANCEL';
-  // [MỚI] Các trường lưu lý do
-  cancellationReason?: string; // Lý do khách hủy
-  adminResponse?: string;      // Phản hồi từ Staff (ví dụ: Từ chối hủy vì đã lên món)
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'REQUEST_CANCEL' | 'OCCUPIED';
+  cancellationReason?: string;
+  adminResponse?: string;
 }
 
-// --- DỮ LIỆU GIẢ LẬP: 20 BÀN (GIỮ NGUYÊN) ---
-const MOCK_TABLES: Table[] = [
+// --- MOCK DATA: DANH SÁCH BÀN ---
+const MOCK_TABLES_DATA: Table[] = [
   { id: 101, name: 'Bàn 01', capacity: 2, status: 'AVAILABLE', type: 'Indoor' },
   { id: 102, name: 'Bàn 02', capacity: 2, status: 'AVAILABLE', type: 'Indoor' },
   { id: 103, name: 'Bàn 03', capacity: 4, status: 'AVAILABLE', type: 'Indoor' },
@@ -47,50 +45,72 @@ const MOCK_TABLES: Table[] = [
   { id: 120, name: 'Bàn 20', capacity: 6, status: 'AVAILABLE', type: 'Outdoor' },
 ];
 
-// [MỚI] Dữ liệu lịch sử giả lập phong phú hơn để test
+// --- MOCK HISTORY: GIẢ LẬP CÁC TRƯỜNG HỢP ---
+const todayStr = new Date().toISOString().split('T')[0];
 const MOCK_HISTORY: Reservation[] = [
+  // 1. Đơn hoàn thành trong quá khứ
   { id: 901, guestName: 'Nguyễn Văn A', phone: '0901234567', time: '2023-11-20T09:00:00', people: 2, tableId: 105, tableName: 'Bàn 05', status: 'COMPLETED' },
-  { id: 902, guestName: 'Trần Thị B', phone: '0901234567', time: '2023-12-15T14:30:00', people: 4, tableId: 112, tableName: 'Bàn 12', status: 'PENDING' },
-  { id: 903, guestName: 'Lê Văn C', phone: '0901234567', time: '2023-12-10T19:00:00', people: 2, tableId: 102, tableName: 'Bàn 02', status: 'CANCELLED' },
-  // Đơn đã xác nhận (Test Request Cancel)
-  { id: 904, guestName: 'Phạm Văn D', phone: '0901234567', time: new Date().toISOString(), people: 4, tableId: 114, tableName: 'Bàn 14', status: 'CONFIRMED' },
-  // Đơn đang chờ Staff duyệt hủy
-  { id: 905, guestName: 'Hoàng Thị E', phone: '0933111222', time: '2023-12-25T18:00:00', people: 6, tableId: 111, tableName: 'Bàn 11', status: 'REQUEST_CANCEL', cancellationReason: 'Bận đột xuất' },
-  // Đơn Staff từ chối hủy (Vẫn giữ status cũ hoặc CONFIRMED, có kèm adminResponse)
-  { id: 906, guestName: 'Nguyễn F', phone: '0911222333', time: '2023-12-24T20:00:00', people: 2, tableId: 101, tableName: 'Bàn 01', status: 'CONFIRMED', adminResponse: 'Đã chuẩn bị nguyên liệu tiệc, không thể hủy sát giờ.' },
+  
+  // 2. Đơn sắp đến (Confirmed) - Giả sử là hôm nay lúc 18:00
+  { id: 902, guestName: 'Trần Thị B', phone: '0908887777', time: `${todayStr}T18:00:00`, people: 4, tableId: 114, tableName: 'Bàn 14', status: 'CONFIRMED' },
+  
+  // 3. Đang có khách (Occupied) - Giả sử đang ngồi bàn 01
+  { id: 903, guestName: 'Lê C', phone: 'Tại quầy', time: new Date().toISOString(), people: 2, tableId: 101, tableName: 'Bàn 01', status: 'OCCUPIED' },
+
+  // 4. Khách yêu cầu hủy (Request Cancel)
+  { id: 904, guestName: 'Phạm D', phone: '0912341234', time: `${todayStr}T20:00:00`, people: 6, tableId: 107, tableName: 'Bàn 07', status: 'REQUEST_CANCEL', cancellationReason: 'Bận đột xuất' },
+
+  // 5. Đơn chờ duyệt (Pending)
+  { id: 905, guestName: 'Hoàng E', phone: '0999888777', time: `${todayStr}T19:30:00`, people: 4, tableId: 112, tableName: 'Bàn 12', status: 'PENDING' },
 ];
 
 export const reservationStore = reactive({
   tables: [] as Table[],
-  reservations: [] as Reservation[],
+  reservations: [...MOCK_HISTORY] as Reservation[],
   isLoading: false,
 
-  // --- CÁC HÀM CŨ GIỮ NGUYÊN ---
+  // --- LOGIC: Lấy trạng thái bàn theo giờ ---
   async fetchTablesByTime(date: string, time: string) {
     this.isLoading = true;
     return new Promise((resolve) => {
       setTimeout(() => {
-        const currentTables = MOCK_TABLES.map(t => ({ 
+        // Reset về mặc định
+        const currentTables = MOCK_TABLES_DATA.map(t => ({ 
           ...t, 
           status: t.status === 'MAINTENANCE' ? 'MAINTENANCE' : 'AVAILABLE' 
         }));
 
-        if (time === '19:00' || time === '20:00') {
-           const busyTableIds = [102, 105, 113, 117, 119]; 
-           // @ts-ignore
-           currentTables.forEach(t => {
-             if (busyTableIds.includes(t.id)) t.status = 'RESERVED';
-           });
-        }
+        const selectedTime = new Date(`${date}T${time}`);
         
+        // Quét lịch sử đặt bàn
+        this.reservations.forEach(res => {
+          if (['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(res.status)) return;
+          if (!res.tableId) return;
+
+          const resTime = new Date(res.time);
+          // Logic: Nếu giờ chọn nằm trong khoảng [Giờ đặt - 60p, Giờ đặt + 60p]
+          const diffMinutes = Math.abs((selectedTime.getTime() - resTime.getTime()) / 60000);
+          
+          if (diffMinutes < 60) { 
+            const tableIndex = currentTables.findIndex(t => t.id === res.tableId);
+            if (tableIndex !== -1) {
+              if (res.status === 'OCCUPIED') currentTables[tableIndex].status = 'OCCUPIED';
+              else if (res.status === 'PENDING') currentTables[tableIndex].status = 'PENDING';
+              // Cả REQUEST_CANCEL cũng coi là RESERVED cho đến khi Staff xác nhận hủy
+              else currentTables[tableIndex].status = 'RESERVED';
+            }
+          }
+        });
+
         // @ts-ignore
         this.tables = currentTables;
         this.isLoading = false;
         resolve(this.tables);
-      }, 500); 
+      }, 300);
     });
   },
 
+  // --- Các hàm Action (Create, Update) giữ nguyên ---
   async createReservation(payload: any) {
     this.isLoading = true;
     return new Promise((resolve) => {
@@ -98,50 +118,72 @@ export const reservationStore = reactive({
         const newRes: Reservation = {
           id: Date.now(),
           ...payload,
-          status: 'PENDING'
+          status: payload.isAdmin ? (payload.initialStatus || 'CONFIRMED') : 'PENDING'
         };
         this.reservations.unshift(newRes); 
+        this.updateTableStatusOnUI(newRes.tableId, newRes.status);
         this.isLoading = false;
         resolve(newRes);
-      }, 1000);
+      }, 500);
     });
   },
   
   async fetchReservations() { 
     this.isLoading = true;
     return new Promise((resolve) => {
-      setTimeout(() => {
-        if (this.reservations.length === 0) {
-            this.reservations = [...MOCK_HISTORY];
-        }
-        this.isLoading = false;
-        resolve(this.reservations);
-      }, 500);
+        setTimeout(() => { this.isLoading = false; resolve(this.reservations); }, 300);
     });
   },
 
-  // --- [UPDATED] LOGIC HỦY MỚI ---
   async cancelReservation(id: number, reason: string = '') {
-    this.isLoading = true;
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const target = this.reservations.find(r => r.id === id);
-        if (target) {
-          // 1. Nếu đơn PENDING -> Hủy luôn
-          if (target.status === 'PENDING') {
+     const target = this.reservations.find(r => r.id === id);
+     if (target) {
+        // Nếu đang PENDING hoặc REQUEST_CANCEL -> Hủy luôn -> Trả bàn
+        if (['PENDING', 'REQUEST_CANCEL'].includes(target.status)) {
             target.status = 'CANCELLED';
             target.cancellationReason = reason;
-          } 
-          // 2. Nếu đơn CONFIRMED -> Chuyển sang REQUEST_CANCEL
-          else if (target.status === 'CONFIRMED') {
-            target.status = 'REQUEST_CANCEL';
+            this.updateTableStatusOnUI(target.tableId, 'AVAILABLE');
+        } else {
+            // Nếu đã CONFIRMED mà Staff hủy -> Vẫn tính là hủy
+            target.status = 'CANCELLED'; 
             target.cancellationReason = reason;
-            console.log(`[STORE] Đã gửi yêu cầu hủy cho đơn #${id}. Lý do: ${reason}`);
-          }
+            this.updateTableStatusOnUI(target.tableId, 'AVAILABLE');
         }
-        this.isLoading = false;
-        resolve(true);
-      }, 800);
-    });
+     }
+  },
+
+  async approveReservation(id: number) {
+      const target = this.reservations.find(r => r.id === id);
+      if (target) {
+          target.status = 'CONFIRMED';
+          this.updateTableStatusOnUI(target.tableId, 'RESERVED');
+      }
+  },
+
+  async checkInReservation(id: number) {
+      const target = this.reservations.find(r => r.id === id);
+      if (target) {
+          target.status = 'OCCUPIED'; 
+          this.updateTableStatusOnUI(target.tableId, 'OCCUPIED');
+      }
+  },
+
+  async checkOutReservation(id: number) {
+      const target = this.reservations.find(r => r.id === id);
+      if (target) {
+          target.status = 'COMPLETED';
+          this.updateTableStatusOnUI(target.tableId, 'AVAILABLE');
+      }
+  },
+
+  updateTableStatusOnUI(tableId: number | null, resStatus: string) {
+      if (!tableId) return;
+      const table = this.tables.find(t => t.id === tableId);
+      if (table && table.status !== 'MAINTENANCE') {
+          if (resStatus === 'OCCUPIED') table.status = 'OCCUPIED';
+          else if (resStatus === 'PENDING') table.status = 'PENDING';
+          else if (['CONFIRMED', 'RESERVED', 'REQUEST_CANCEL'].includes(resStatus)) table.status = 'RESERVED';
+          else table.status = 'AVAILABLE';
+      }
   }
 });

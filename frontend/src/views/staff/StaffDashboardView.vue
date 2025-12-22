@@ -15,7 +15,7 @@
           <span class="icon">📅</span> <span class="text">Quản Lý Đặt Bàn</span>
         </li>
         <li :class="{ active: currentTab === 'TABLES' }" @click="currentTab = 'TABLES'">
-          <span class="icon">🪑</span> <span class="text">Sơ Đồ Bàn</span>
+          <span class="icon">🪑</span> <span class="text">Sơ Đồ Bàn (Map)</span>
         </li>
       </ul>
       <div class="sidebar-footer"><p>© 2025 Trạm Sạc FC</p></div>
@@ -32,24 +32,10 @@
             <span class="name">{{ authStore.user?.name || 'Nhân Viên' }}</span>
             <span class="role-badge">STAFF</span>
           </div>
-          <div class="avatar-circle">
-            {{ getUserInitial }}
-            <span class="status-dot"></span>
-          </div>
+          <div class="avatar-circle">{{ getUserInitial }}</div>
           <transition name="fade-slide">
             <div v-if="showUserMenu" class="user-dropdown">
-              <div class="dropdown-header">
-                <div class="header-avatar">{{ getUserInitial }}</div>
-                <div class="header-info">
-                  <span class="user-display-name">{{ authStore.user?.name }}</span>
-                  <span class="user-email">{{ authStore.user?.email }}</span>
-                </div>
-              </div>
-              <div class="dropdown-body">
-                <div class="menu-item logout" @click="handleLogout">
-                  <span class="menu-icon">🚪</span> Đăng xuất
-                </div>
-              </div>
+              <div class="menu-item logout" @click="handleLogout">🚪 Đăng xuất</div>
             </div>
           </transition>
         </div>
@@ -58,34 +44,19 @@
       <div class="content-body">
         
         <div v-if="currentTab === 'RESERVATIONS'" class="tab-content">
-          
           <div class="toolbar">
             <div class="search-box">
               <span class="search-icon">🔍</span>
-              <input 
-                v-model="searchKeyword" 
-                type="text" 
-                placeholder="Tìm tên khách, SĐT..." 
-              />
+              <input v-model="searchKeyword" type="text" placeholder="Tìm tên khách, SĐT..." />
             </div>
-            
             <div class="filter-tabs">
-              <button 
-                v-for="status in statusTabs" 
-                :key="status.value"
+              <button v-for="status in statusTabs" :key="status.value"
                 :class="['filter-tab', { active: filterStatus === status.value }]"
-                @click="filterStatus = status.value"
-              >
-                {{ status.label }} 
-                <span class="count-badge" v-if="status.value !== 'ALL'">
-                  {{ getCountByStatus(status.value) }}
-                </span>
+                @click="filterStatus = status.value">
+                {{ status.label }} <span class="count-badge" v-if="status.value!=='ALL'">{{ getCountByStatus(status.value) }}</span>
               </button>
             </div>
-
-            <button class="btn-create" @click="openCreateModal">
-              + Tạo Đơn Mới
-            </button>
+            <button class="btn-create" @click="openCreateModal">+ Tạo Đơn Mới</button>
           </div>
 
           <div class="table-card">
@@ -102,17 +73,14 @@
               </thead>
               <tbody>
                 <tr v-if="filteredReservations.length === 0">
-                  <td colspan="6" class="no-data">Không tìm thấy đơn nào phù hợp.</td>
+                  <td colspan="6" class="no-data">Không tìm thấy đơn nào.</td>
                 </tr>
                 <tr v-for="item in filteredReservations" :key="item.id">
                   <td class="id-col">#{{ item.id }}</td>
                   <td>
                     <div class="customer-cell">
                       <div class="customer-avatar">{{ item.guestName.charAt(0) }}</div>
-                      <div>
-                        <strong>{{ item.guestName }}</strong>
-                        <div class="sub-text">{{ item.phone }}</div>
-                      </div>
+                      <div><strong>{{ item.guestName }}</strong><div class="sub-text">{{ item.phone }}</div></div>
                     </div>
                   </td>
                   <td>
@@ -128,35 +96,26 @@
                     </div>
                   </td>
                   <td>
-                    <span :class="['status-badge', item.status.toLowerCase()]">
-                      {{ getStatusLabel(item.status) }}
-                    </span>
+                    <span :class="['status-badge', item.status.toLowerCase()]">{{ getStatusLabel(item.status) }}</span>
                     <div v-if="item.status === 'REQUEST_CANCEL'" class="note-text">
-                      Lý do: "{{ item.cancellationReason }}"
+                        Lý do: "{{ item.cancellationReason }}"
                     </div>
                   </td>
-                  
                   <td class="actions-cell text-right">
-                    
                     <div v-if="item.status === 'PENDING'" class="action-group">
-                      <button @click="handleApprove(item)" class="btn-icon success" title="Duyệt đơn">✔</button>
-                      <button @click="handleReject(item)" class="btn-icon danger" title="Từ chối">✕</button>
+                      <button @click="handleApprove(item)" class="btn-icon success">✔</button>
+                      <button @click="handleReject(item)" class="btn-icon danger">✕</button>
                     </div>
-
                     <div v-else-if="item.status === 'REQUEST_CANCEL'" class="action-group">
                       <button @click="handleApproveCancel(item)" class="btn-sm btn-danger-outline">Đồng ý Hủy</button>
                     </div>
-
                     <div v-else-if="item.status === 'CONFIRMED'" class="action-group">
                       <button @click="handleCheckIn(item)" class="btn-sm btn-primary">⬇ Check-in</button>
                       <button @click="handleReject(item)" class="btn-icon danger" title="Hủy đơn">✕</button>
                     </div>
-
                     <div v-else-if="item.status === 'OCCUPIED'" class="action-group">
                       <button @click="handleCheckOut(item)" class="btn-sm btn-success">⬆ Check-out</button>
                     </div>
-
-                    <span v-else class="text-gray">--</span>
                   </td>
                 </tr>
               </tbody>
@@ -164,10 +123,51 @@
           </div>
         </div>
 
-        <div v-else class="tab-content placeholder-tab">
-          <div class="empty-state-icon">🪑</div>
-          <h3>Sơ Đồ Bàn Ăn (Map)</h3>
-          <p>Tính năng đang phát triển theo FR-2.4</p>
+        <div v-else class="tab-content">
+          <div class="toolbar map-toolbar">
+             <div class="map-filters">
+                <div class="mf-item">
+                    <label>Ngày:</label>
+                    <input type="date" v-model="mapFilter.date" @change="refreshMap">
+                </div>
+                <div class="mf-item">
+                    <label>Giờ:</label>
+                    <select v-model="mapFilter.hour" @change="refreshMap">
+                        <option v-for="h in 24" :key="h-1" :value="h-1">{{ (h-1).toString().padStart(2,'0') }}</option>
+                    </select>
+                    :
+                    <select v-model="mapFilter.minute" @change="refreshMap">
+                        <option v-for="m in 60" :key="m-1" :value="m-1">{{ (m-1).toString().padStart(2,'0') }}</option>
+                    </select>
+                </div>
+                <button class="btn-now" @click="resetToNow">Hiện tại</button>
+             </div>
+             
+             <div class="map-legend">
+                <span><i class="dot available"></i> Trống</span>
+                <span><i class="dot pending"></i> Chờ duyệt</span>
+                <span><i class="dot reserved"></i> Đã đặt</span>
+                <span><i class="dot occupied"></i> Đang có khách</span>
+             </div>
+          </div>
+
+          <div class="staff-map-grid">
+             <div 
+               v-for="table in reservationStore.tables" 
+               :key="table.id"
+               class="staff-table-card"
+               :class="table.status.toLowerCase()"
+               @click="handleTableClick(table)"
+             >
+                <div class="table-header">
+                   <span class="t-name">{{ table.name }}</span>
+                   <span class="t-cap">👤 {{ table.capacity }}</span>
+                </div>
+                <div class="table-body">
+                   <div class="status-big">{{ getStatusLabelMap(table.status) }}</div>
+                </div>
+             </div>
+          </div>
         </div>
 
       </div>
@@ -177,15 +177,17 @@
       v-if="showCreateModal"
       :isVisible="showCreateModal"
       :isAdminMode="true" 
-      @submit="handleCreateReservation"
-      @close="showCreateModal = false"
+      :selectedTable="selectedTableForAction"
+      :initialData="staffInitData"
+      @submit="handleStaffCreateReservation"
+      @close="closeModal"
     />
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue';
+import { ref, computed, onMounted, reactive, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { authStore } from '../../store/authStore';
@@ -197,184 +199,157 @@ const currentTab = ref('RESERVATIONS');
 const showUserMenu = ref(false);
 const showCreateModal = ref(false);
 
-// Bộ lọc & Tìm kiếm
+// --- TAB 1 LOGIC ---
 const searchKeyword = ref('');
 const filterStatus = ref('ALL');
-
 const statusTabs = [
   { label: 'Tất cả', value: 'ALL' },
   { label: 'Chờ duyệt', value: 'PENDING' },
-  { label: 'Yêu cầu hủy', value: 'REQUEST_CANCEL' }, // Mới
+  { label: 'Khách hủy', value: 'REQUEST_CANCEL' },
   { label: 'Sắp đến', value: 'CONFIRMED' },
   { label: 'Đang phục vụ', value: 'OCCUPIED' },
-  { label: 'Lịch sử', value: 'HISTORY' } // Gộp Completed + Cancelled
+  { label: 'Lịch sử', value: 'HISTORY' } 
 ];
-
-// Computed Data
-const getUserInitial = computed(() => authStore.user?.name.charAt(0).toUpperCase() || 'S');
-const todayString = computed(() => new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }));
 
 const filteredReservations = computed(() => {
   let data = reservationStore.reservations;
-
-  // 1. Lọc theo Tab Status
   if (filterStatus.value !== 'ALL') {
-    if (filterStatus.value === 'HISTORY') {
-      data = data.filter(r => ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(r.status));
-    } else {
-      data = data.filter(r => r.status === filterStatus.value);
-    }
+    if (filterStatus.value === 'HISTORY') data = data.filter(r => ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(r.status));
+    else data = data.filter(r => r.status === filterStatus.value);
   }
-
-  // 2. Tìm kiếm (FR-8.1)
   if (searchKeyword.value) {
     const k = searchKeyword.value.toLowerCase();
-    data = data.filter(r => 
-      r.guestName.toLowerCase().includes(k) || 
-      r.phone.includes(k) ||
-      r.id.toString().includes(k)
-    );
+    data = data.filter(r => r.guestName.toLowerCase().includes(k) || r.phone.includes(k));
   }
-
-  // Sắp xếp: Mới nhất lên đầu
   return data.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 });
 
-// Helper Functions
+const handleApprove = async (item: any) => {
+   await reservationStore.approveReservation(item.id);
+   Swal.fire('Duyệt thành công', '', 'success');
+};
+const handleReject = async (item: any) => {
+   const { value: reason } = await Swal.fire({ input: 'text', title: 'Lý do hủy', showCancelButton: true });
+   if (reason) { await reservationStore.cancelReservation(item.id, reason); Swal.fire('Đã hủy', '', 'info'); }
+};
+const handleApproveCancel = async (item: any) => {
+   await reservationStore.cancelReservation(item.id, 'Staff approved cancel');
+   Swal.fire('Đã chấp nhận hủy', '', 'success');
+};
+const handleCheckIn = async (item: any) => { await reservationStore.checkInReservation(item.id); Swal.fire('Check-in xong', '', 'success'); };
+const handleCheckOut = async (item: any) => { await reservationStore.checkOutReservation(item.id); Swal.fire('Check-out xong', '', 'success'); };
+
+// --- TAB 2 LOGIC: MAP ---
+const selectedTableForAction = ref<any>(null);
+const staffInitData = reactive({ date: '', time: '', people: 2 });
+
+const mapFilter = reactive({
+    date: new Date().toISOString().split('T')[0],
+    hour: new Date().getHours(),
+    minute: new Date().getMinutes()
+});
+
+const refreshMap = () => {
+   const t = `${mapFilter.hour.toString().padStart(2,'0')}:${mapFilter.minute.toString().padStart(2,'0')}`;
+   reservationStore.fetchTablesByTime(mapFilter.date, t);
+};
+
+const resetToNow = () => {
+    const now = new Date();
+    mapFilter.date = now.toISOString().split('T')[0];
+    mapFilter.hour = now.getHours();
+    mapFilter.minute = now.getMinutes();
+    refreshMap();
+};
+
+const handleTableClick = async (table: any) => {
+   selectedTableForAction.value = table;
+   // Dùng thời gian filter hiện tại để làm mặc định cho form
+   const dateStr = mapFilter.date;
+   const timeStr = `${mapFilter.hour.toString().padStart(2,'0')}:${mapFilter.minute.toString().padStart(2,'0')}`;
+
+   if (table.status === 'AVAILABLE') {
+       const { isConfirmed, value } = await Swal.fire({
+          title: `Bàn ${table.name}`,
+          text: 'Bàn Trống. Bạn muốn làm gì?',
+          showDenyButton: true, showCancelButton: true,
+          confirmButtonText: '⚡ Khách vào luôn (Check-in)',
+          denyButtonText: '📅 Đặt trước (Booking)',
+          cancelButtonText: 'Đóng'
+       });
+
+       if (isConfirmed) { // Check-in ngay
+           const { value: guestName } = await Swal.fire({ input: 'text', title: 'Tên khách', inputValue: 'Khách lẻ' });
+           if (guestName) {
+               await reservationStore.createReservation({
+                   guestName, phone: 'N/A', people: table.capacity,
+                   date: dateStr, time: timeStr, reservation_time: `${dateStr}T${timeStr}`,
+                   tableId: table.id, tableName: table.name,
+                   isAdmin: true, initialStatus: 'OCCUPIED'
+               });
+               Swal.fire('Thành công', 'Bàn đã chuyển sang CÓ KHÁCH', 'success');
+           }
+       } else if (value === false) { // Đặt trước
+           staffInitData.date = dateStr; staffInitData.time = timeStr;
+           showCreateModal.value = true;
+       }
+   }
+   else if (table.status === 'PENDING') {
+       const booking = reservationStore.reservations.find(r => r.tableId === table.id && r.status === 'PENDING');
+       if (booking) {
+           const res = await Swal.fire({ title: 'Duyệt đơn?', html: `Khách: <b>${booking.guestName}</b>`, showCancelButton: true, confirmButtonText: 'Duyệt', cancelButtonText: 'Từ chối' });
+           if (res.isConfirmed) await reservationStore.approveReservation(booking.id);
+           else if (res.dismiss === Swal.DismissReason.cancel) await reservationStore.cancelReservation(booking.id, 'Staff từ chối qua map');
+       }
+   }
+   else if (table.status === 'OCCUPIED') {
+       const booking = reservationStore.reservations.find(r => r.tableId === table.id && r.status === 'OCCUPIED');
+       const res = await Swal.fire({ title: 'Thanh toán?', text: `Khách: ${booking?.guestName || 'Unknown'}`, showCancelButton: true, confirmButtonText: 'Check-out' });
+       if (res.isConfirmed && booking) await reservationStore.checkOutReservation(booking.id);
+   }
+};
+
+// Form handling
+const openCreateModal = () => { selectedTableForAction.value = null; showCreateModal.value = true; };
+const closeModal = () => { showCreateModal.value = false; selectedTableForAction.value = null; };
+const handleStaffCreateReservation = async (formData: any) => {
+    await reservationStore.createReservation({
+        ...formData,
+        reservation_time: `${formData.date}T${formData.time}`,
+        tableId: selectedTableForAction.value?.id,
+        tableName: selectedTableForAction.value?.name,
+        isAdmin: true, initialStatus: 'CONFIRMED'
+    });
+    closeModal();
+    Swal.fire('Thành công', 'Đã tạo đơn', 'success');
+};
+
+// Helpers
 const getTabName = (tab: string) => tab === 'RESERVATIONS' ? 'Quản Lý Đặt Bàn' : 'Sơ Đồ Khu Vực';
-const getCountByStatus = (status: string) => {
-  if(status === 'HISTORY') return reservationStore.reservations.filter(r => ['COMPLETED', 'CANCELLED'].includes(r.status)).length;
-  return reservationStore.reservations.filter(r => r.status === status).length;
-};
-const getStatusLabel = (status: string) => {
-  const map: any = { 
-    PENDING: 'Chờ duyệt', CONFIRMED: 'Đã xác nhận', REQUEST_CANCEL: 'Khách hủy',
-    OCCUPIED: 'Đang ăn', COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy', NO_SHOW: 'Vắng mặt' 
-  };
-  return map[status] || status;
-};
+const getUserInitial = computed(() => authStore.user?.name.charAt(0).toUpperCase() || 'S');
+const todayString = computed(() => new Date().toLocaleDateString('vi-VN'));
+const getCountByStatus = (status: string) => status==='HISTORY' ? reservationStore.reservations.filter(r=>['COMPLETED','CANCELLED', 'NO_SHOW'].includes(r.status)).length : reservationStore.reservations.filter(r=>r.status===status).length;
+const getStatusLabel = (s:string) => ({PENDING:'Chờ duyệt',CONFIRMED:'Sắp đến',OCCUPIED:'Đang có khách',COMPLETED:'Xong',CANCELLED:'Hủy', REQUEST_CANCEL: 'Yêu cầu hủy'}[s]||s);
+const getStatusLabelMap = (s: string) => ({ AVAILABLE: 'Trống', PENDING: 'Chờ duyệt', RESERVED: 'Có khách đặt', OCCUPIED: 'Đang có khách', MAINTENANCE: 'Bảo trì' }[s] || s);
 const formatTimeOnly = (iso: string) => new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 const formatDateOnly = (iso: string) => new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-
-// --- XỬ LÝ NGHIỆP VỤ (ACTIONS) ---
-
-// 1. Duyệt Đơn (FR-4.1)
-const handleApprove = async (item: any) => {
-  const result = await Swal.fire({
-    title: 'Duyệt đơn này?',
-    text: `Khách ${item.guestName} - ${item.people} người`,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Duyệt ngay',
-    confirmButtonColor: '#2ecc71'
-  });
-  if (result.isConfirmed) {
-    // Logic thực tế sẽ gọi API update status
-    // Ở đây giả lập sửa store
-    item.status = 'CONFIRMED';
-    Swal.fire('Thành công', 'Đơn đã được xác nhận', 'success');
-  }
-};
-
-// 2. Từ chối / Hủy (FR-4.2, FR-7.2)
-const handleReject = async (item: any) => {
-  const { value: reason } = await Swal.fire({
-    title: 'Từ chối / Hủy Đơn',
-    input: 'textarea',
-    inputLabel: 'Nhập lý do hủy (bắt buộc):',
-    inputPlaceholder: 'Ví dụ: Hết bàn, Khách không nghe máy...',
-    showCancelButton: true,
-    confirmButtonColor: '#e74c3c',
-    confirmButtonText: 'Xác nhận hủy',
-    inputValidator: (value) => {
-      if (!value) return 'Bạn cần nhập lý do hủy!';
-    }
-  });
-
-  if (reason) {
-    item.status = 'CANCELLED';
-    item.adminResponse = reason; // Lưu lý do Staff nhập
-    Swal.fire('Đã hủy', `Lý do: ${reason}`, 'success');
-  }
-};
-
-// 3. Duyệt yêu cầu hủy của khách
-const handleApproveCancel = async (item: any) => {
-   const result = await Swal.fire({
-    title: 'Đồng ý hủy đơn?',
-    text: `Khách đưa ra lý do: "${item.cancellationReason}"`,
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#e74c3c',
-    confirmButtonText: 'Đồng ý hủy'
-  });
-  if(result.isConfirmed) {
-    item.status = 'CANCELLED';
-    Swal.fire('Đã hủy', 'Đơn đặt bàn đã được hủy theo yêu cầu khách.', 'success');
-  }
-};
-
-// 4. Check-in (FR-6.1)
-const handleCheckIn = async (item: any) => {
-  const result = await Swal.fire({
-    title: 'Check-in Khách?',
-    text: 'Xác nhận khách đã đến và nhận bàn?',
-    icon: 'info',
-    showCancelButton: true,
-    confirmButtonColor: '#3498db',
-    confirmButtonText: 'Check-in'
-  });
-  if (result.isConfirmed) {
-    item.status = 'OCCUPIED';
-    Swal.fire('Check-in thành công', 'Trạng thái bàn đã chuyển sang CÓ KHÁCH', 'success');
-  }
-};
-
-// 5. Check-out (FR-6.2)
-const handleCheckOut = async (item: any) => {
-  const result = await Swal.fire({
-    title: 'Thanh toán & Trả bàn?',
-    text: 'Xác nhận khách đã hoàn tất thanh toán?',
-    icon: 'success',
-    showCancelButton: true,
-    confirmButtonColor: '#27ae60',
-    confirmButtonText: 'Hoàn tất'
-  });
-  if (result.isConfirmed) {
-    item.status = 'COMPLETED';
-    Swal.fire('Hoàn tất', 'Bàn đã trống và sẵn sàng đón khách mới.', 'success');
-  }
-};
-
-// 6. Tạo đơn mới (FR-3.2)
-const openCreateModal = () => { showCreateModal.value = true; };
-const handleCreateReservation = async (formData: any) => {
-  await reservationStore.createReservation({
-    ...formData,
-    reservation_time: `${formData.date}T${formData.time}`,
-    tableName: formData.tableName || 'Bàn Staff chọn' // Giả lập
-  });
-  showCreateModal.value = false;
-  Swal.fire('Thành công', 'Đã tạo đơn đặt bàn mới', 'success');
-};
-
 const toggleUserMenu = () => { showUserMenu.value = !showUserMenu.value; };
 const closeUserMenu = () => { showUserMenu.value = false; };
 const handleLogout = () => { authStore.logout(); router.push('/'); };
 
 onMounted(() => {
   reservationStore.fetchReservations();
+  refreshMap();
 });
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
-
 .dashboard-layout { display: flex; height: 100vh; background-color: #f4f6f8; font-family: 'Montserrat', sans-serif; color: #333; }
 
-/* SIDEBAR & HEADER (Giữ nguyên style cũ, chỉ tút lại chút) */
+/* Sidebar & Header Styles Copy from previous version */
 .sidebar { width: 260px; background: #1a1a1a; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
-.brand { height: 70px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+.brand { height: 70px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
 .brand-logo { height: 32px; margin-right: 12px; filter: brightness(0) invert(1); }
 .brand-text { font-weight: 700; color: #a67c52; font-size: 1.1rem; }
 .brand-sub { font-size: 0.7rem; color: #888; display: block; }
@@ -393,83 +368,71 @@ onMounted(() => {
 .user-area { display: flex; align-items: center; gap: 12px; cursor: pointer; position: relative; }
 .user-info { text-align: right; }
 .role-badge { font-size: 0.65rem; background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #7f8c8d; }
-.avatar-circle { width: 40px; height: 40px; background: #34495e; color: #fff; border-radius: 50%; display: grid; place-items: center; font-weight: 700; position: relative; }
-.status-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #2ecc71; border: 2px solid #fff; border-radius: 50%; }
-
-/* USER DROPDOWN */
-.user-dropdown { position: absolute; top: 55px; right: 0; width: 250px; background: #fff; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); z-index: 100; border: 1px solid #eee; }
-.dropdown-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; gap: 10px; align-items: center; }
-.header-avatar { width: 35px; height: 35px; background: #a67c52; color: #fff; border-radius: 50%; display: grid; place-items: center; }
-.user-display-name { font-weight: 700; display: block; font-size: 0.9rem; }
-.user-email { font-size: 0.75rem; color: #888; }
-.menu-item { padding: 10px 15px; cursor: pointer; display: flex; gap: 10px; color: #555; }
+.avatar-circle { width: 40px; height: 40px; background: #34495e; color: #fff; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
+.user-dropdown { position: absolute; top: 55px; right: 0; width: 150px; background: #fff; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); z-index: 100; border: 1px solid #eee; padding: 10px; }
+.menu-item { padding: 8px 10px; cursor: pointer; color: #555; }
 .menu-item:hover { background: #f9f9f9; }
-.menu-item.logout { color: #e74c3c; }
 
-/* MAIN CONTENT */
 .content-body { padding: 30px; overflow-y: auto; flex: 1; }
-
-/* TOOLBAR */
 .toolbar { display: flex; gap: 15px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
 .search-box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 0 12px; display: flex; align-items: center; height: 42px; width: 250px; }
 .search-box input { border: none; outline: none; flex: 1; margin-left: 8px; font-size: 0.9rem; }
+.filter-tabs { display: flex; background: #e0e0e0; padding: 4px; border-radius: 8px; gap: 4px; }
+.filter-tab { border: none; background: none; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #666; cursor: pointer; }
+.filter-tab.active { background: #fff; color: #333; }
+.count-badge { background: #95a5a6; color: #fff; font-size: 0.7rem; padding: 1px 5px; border-radius: 10px; margin-left: 5px; }
+.btn-create { margin-left: auto; background: #27ae60; color: #fff; border: none; padding: 0 20px; height: 42px; border-radius: 8px; font-weight: 600; cursor: pointer; }
 
-.filter-tabs { display: flex; background: #e0e0e0; padding: 4px; border-radius: 8px; gap: 4px; overflow-x: auto; }
-.filter-tab { border: none; background: none; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #666; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
-.filter-tab.active { background: #fff; color: #333; shadow: 0 2px 5px rgba(0,0,0,0.05); }
-.count-badge { background: #95a5a6; color: #fff; font-size: 0.7rem; padding: 1px 5px; border-radius: 10px; }
-.filter-tab.active .count-badge { background: #a67c52; }
-
-.btn-create { margin-left: auto; background: #27ae60; color: #fff; border: none; padding: 0 20px; height: 42px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-.btn-create:hover { background: #2ecc71; }
-
-/* TABLE */
+/* Table Styles */
 .table-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); overflow: hidden; }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th { background: #f8f9fa; text-align: left; padding: 15px; font-size: 0.8rem; text-transform: uppercase; color: #7f8c8d; border-bottom: 2px solid #eee; }
 .data-table td { padding: 15px; border-bottom: 1px solid #f1f1f1; vertical-align: middle; font-size: 0.9rem; color: #2c3e50; }
-.id-col { font-family: monospace; color: #95a5a6; }
-.no-data { text-align: center; padding: 40px; color: #999; font-style: italic; }
-
 .customer-cell { display: flex; gap: 10px; align-items: center; }
 .customer-avatar { width: 32px; height: 32px; background: #ecf0f1; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #7f8c8d; }
-.sub-text { font-size: 0.8rem; color: #95a5a6; }
-
-.time-big { display: block; font-weight: 700; font-size: 1rem; }
-.date-small { color: #95a5a6; font-size: 0.8rem; }
-
-.table-badge { background: #34495e; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
-.people-count { display: block; font-size: 0.8rem; color: #7f8c8d; margin-top: 3px; }
-
-/* Status Badges */
 .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
 .status-badge.pending { background: #fff3cd; color: #856404; }
 .status-badge.confirmed { background: #d4edda; color: #155724; }
 .status-badge.occupied { background: #cce5ff; color: #004085; }
-.status-badge.cancelled, .status-badge.request_cancel { background: #f8d7da; color: #721c24; }
-.status-badge.completed { background: #e2e3e5; color: #383d41; }
+.status-badge.cancelled { background: #f8d7da; color: #721c24; }
 .note-text { font-size: 0.75rem; color: #c0392b; margin-top: 4px; font-style: italic; max-width: 150px; }
 
-/* Actions */
-.text-right { text-align: right; }
-.action-group { display: flex; gap: 8px; justify-content: flex-end; }
-.btn-icon { width: 32px; height: 32px; border-radius: 6px; border: none; cursor: pointer; display: grid; place-items: center; font-size: 0.9rem; transition: 0.2s; }
+/* MAP STYLES */
+.map-toolbar { justify-content: space-between; align-items: flex-end; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 20px; }
+.map-filters { display: flex; gap: 15px; align-items: center; }
+.mf-item { display: flex; gap: 5px; align-items: center; font-size: 0.9rem; }
+.mf-item input, .mf-item select { padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; }
+.btn-now { background: #34495e; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+.map-legend { display: flex; gap: 15px; font-size: 0.85rem; }
+
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+.dot.available { background: #fff; border: 2px solid #27ae60; }
+.dot.pending { background: #f1c40f; }
+.dot.reserved { background: #e74c3c; }
+.dot.occupied { background: #8e44ad; }
+
+.staff-map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; padding-bottom: 50px; }
+.staff-table-card { background: #fff; border: 2px solid #eee; border-radius: 10px; padding: 15px; cursor: pointer; transition: 0.2s; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
+.staff-table-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.staff-table-card.available { border-color: #27ae60; }
+.staff-table-card.pending { background: #fffcf2; border-color: #f1c40f; animation: pulse 2s infinite; }
+.staff-table-card.reserved { background: #fff5f5; border-color: #e74c3c; }
+.staff-table-card.occupied { background: #f3e5f5; border-color: #8e44ad; }
+.table-header { display: flex; justify-content: space-between; font-weight: 700; color: #555; margin-bottom: 10px; }
+.status-big { text-align: center; font-weight: 600; font-size: 0.9rem; padding: 5px; border-radius: 4px; background: rgba(0,0,0,0.03); }
+.staff-table-card.available .status-big { color: #27ae60; }
+.staff-table-card.pending .status-big { color: #f39c12; }
+.staff-table-card.reserved .status-big { color: #c0392b; }
+.staff-table-card.occupied .status-big { color: #8e44ad; }
+
+.action-group { display: flex; gap: 5px; justify-content: flex-end; }
+.btn-icon { width: 30px; height: 30px; border-radius: 4px; border: none; cursor: pointer; display: grid; place-items: center; }
 .btn-icon.success { background: #d4edda; color: #27ae60; }
-.btn-icon.success:hover { background: #27ae60; color: #fff; }
 .btn-icon.danger { background: #f8d7da; color: #c0392b; }
-.btn-icon.danger:hover { background: #c0392b; color: #fff; }
-
-.btn-sm { padding: 6px 12px; border-radius: 6px; border: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.btn-sm { padding: 5px 10px; border-radius: 4px; border: none; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
 .btn-primary { background: #3498db; color: #fff; }
-.btn-primary:hover { background: #2980b9; }
 .btn-success { background: #27ae60; color: #fff; }
-.btn-success:hover { background: #219150; }
 .btn-danger-outline { border: 1px solid #e74c3c; background: #fff; color: #e74c3c; }
-.btn-danger-outline:hover { background: #e74c3c; color: #fff; }
 
-.placeholder-tab { text-align: center; padding: 60px; color: #bbb; }
-.empty-state-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.5; }
-
-.fade-slide-enter-active, .fade-slide-leave-active { transition: all 0.2s; }
-.fade-slide-enter-from, .fade-slide-leave-to { opacity: 0; transform: translateY(10px); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(241, 196, 15, 0); } 100% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0); } }
 </style>
