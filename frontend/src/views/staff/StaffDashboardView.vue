@@ -3,12 +3,8 @@
     <aside class="sidebar">
       <div class="brand" @click="router.push('/')">
         <img src="../../assets/logo.png" alt="Logo" class="brand-logo" />
-        <div class="brand-info">
-          <span class="brand-text">Trạm Sạc FC</span>
-          <span class="brand-sub">Staff Portal</span>
-        </div>
+        <div class="brand-info"><span class="brand-text">Trạm Sạc FC</span><span class="brand-sub">Staff Portal</span></div>
       </div>
-
       <ul class="nav-menu">
         <li class="nav-label">Nghiệp Vụ Hàng Ngày</li>
         <li :class="{ active: currentTab === 'RESERVATIONS' }" @click="currentTab = 'RESERVATIONS'">
@@ -63,18 +59,11 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Mã #</th>
-                  <th>Khách Hàng</th>
-                  <th>Thời Gian</th>
-                  <th>Bàn & Khách</th>
-                  <th>Trạng Thái</th>
-                  <th class="text-right">Xử Lý</th>
+                  <th>Mã #</th> <th>Khách Hàng</th> <th>Thời Gian</th> <th>Bàn & Khách</th> <th>Trạng Thái</th> <th class="text-right">Xử Lý</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="filteredReservations.length === 0">
-                  <td colspan="6" class="no-data">Không tìm thấy đơn nào.</td>
-                </tr>
+                <tr v-if="filteredReservations.length === 0"><td colspan="6" class="no-data">Không tìm thấy đơn nào.</td></tr>
                 <tr v-for="item in filteredReservations" :key="item.id">
                   <td class="id-col">#{{ item.id }}</td>
                   <td>
@@ -97,9 +86,7 @@
                   </td>
                   <td>
                     <span :class="['status-badge', item.status.toLowerCase()]">{{ getStatusLabel(item.status) }}</span>
-                    <div v-if="item.status === 'REQUEST_CANCEL'" class="note-text">
-                        Lý do: "{{ item.cancellationReason }}"
-                    </div>
+                    <div v-if="item.status === 'REQUEST_CANCEL'" class="note-text">Lý do: "{{ item.cancellationReason }}"</div>
                   </td>
                   <td class="actions-cell text-right">
                     <div v-if="item.status === 'PENDING'" class="action-group">
@@ -124,23 +111,33 @@
         </div>
 
         <div v-else class="tab-content">
-          <div class="toolbar map-toolbar">
-             <div class="map-filters">
+          <div class="toolbar map-toolbar-custom">
+             <div class="map-filters-styled">
                 <div class="mf-item">
-                    <label>Ngày:</label>
+                    <label>Ngày xem sơ đồ</label>
                     <input type="date" v-model="mapFilter.date" @change="refreshMap">
                 </div>
+                
                 <div class="mf-item">
-                    <label>Giờ:</label>
-                    <select v-model="mapFilter.hour" @change="refreshMap">
-                        <option v-for="h in 24" :key="h-1" :value="h-1">{{ (h-1).toString().padStart(2,'0') }}</option>
-                    </select>
-                    :
-                    <select v-model="mapFilter.minute" @change="refreshMap">
-                        <option v-for="m in 60" :key="m-1" :value="m-1">{{ (m-1).toString().padStart(2,'0') }}</option>
-                    </select>
+                    <label>Thời gian</label>
+                    <div class="time-group">
+                        <select v-model="mapFilter.hour" @change="refreshMap">
+                            <option v-for="h in 24" :key="h-1" :value="h-1">
+                                {{ (h-1).toString().padStart(2,'0') }} giờ
+                            </option>
+                        </select>
+                        <span class="colon">:</span>
+                        <select v-model="mapFilter.minute" @change="refreshMap" class="minute-select">
+                            <option v-for="m in 60" :key="m-1" :value="m-1">
+                                {{ (m-1).toString().padStart(2,'0') }}
+                            </option>
+                        </select>
+                    </div>
                 </div>
-                <button class="btn-now" @click="resetToNow">Hiện tại</button>
+
+                <div class="mf-item action">
+                    <button class="btn-dark-flat" @click="resetToNow">HIỆN TẠI</button>
+                </div>
              </div>
              
              <div class="map-legend">
@@ -187,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive, onUnmounted } from 'vue';
+import { ref, computed, onMounted, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { authStore } from '../../store/authStore';
@@ -224,18 +221,9 @@ const filteredReservations = computed(() => {
   return data.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 });
 
-const handleApprove = async (item: any) => {
-   await reservationStore.approveReservation(item.id);
-   Swal.fire('Duyệt thành công', '', 'success');
-};
-const handleReject = async (item: any) => {
-   const { value: reason } = await Swal.fire({ input: 'text', title: 'Lý do hủy', showCancelButton: true });
-   if (reason) { await reservationStore.cancelReservation(item.id, reason); Swal.fire('Đã hủy', '', 'info'); }
-};
-const handleApproveCancel = async (item: any) => {
-   await reservationStore.cancelReservation(item.id, 'Staff approved cancel');
-   Swal.fire('Đã chấp nhận hủy', '', 'success');
-};
+const handleApprove = async (item: any) => { await reservationStore.approveReservation(item.id); Swal.fire('Duyệt thành công', '', 'success'); };
+const handleReject = async (item: any) => { const { value: reason } = await Swal.fire({ input: 'text', title: 'Lý do hủy', showCancelButton: true }); if (reason) { await reservationStore.cancelReservation(item.id, reason); Swal.fire('Đã hủy', '', 'info'); } };
+const handleApproveCancel = async (item: any) => { await reservationStore.cancelReservation(item.id, 'Staff approved cancel'); Swal.fire('Đã chấp nhận hủy', '', 'success'); };
 const handleCheckIn = async (item: any) => { await reservationStore.checkInReservation(item.id); Swal.fire('Check-in xong', '', 'success'); };
 const handleCheckOut = async (item: any) => { await reservationStore.checkOutReservation(item.id); Swal.fire('Check-out xong', '', 'success'); };
 
@@ -264,21 +252,17 @@ const resetToNow = () => {
 
 const handleTableClick = async (table: any) => {
    selectedTableForAction.value = table;
-   // Dùng thời gian filter hiện tại để làm mặc định cho form
    const dateStr = mapFilter.date;
    const timeStr = `${mapFilter.hour.toString().padStart(2,'0')}:${mapFilter.minute.toString().padStart(2,'0')}`;
 
    if (table.status === 'AVAILABLE') {
        const { isConfirmed, value } = await Swal.fire({
-          title: `Bàn ${table.name}`,
-          text: 'Bàn Trống. Bạn muốn làm gì?',
+          title: `Bàn ${table.name}`, text: 'Bàn Trống. Bạn muốn làm gì?',
           showDenyButton: true, showCancelButton: true,
-          confirmButtonText: '⚡ Khách vào luôn (Check-in)',
-          denyButtonText: '📅 Đặt trước (Booking)',
-          cancelButtonText: 'Đóng'
+          confirmButtonText: '⚡ Khách vào luôn (Check-in)', denyButtonText: '📅 Đặt trước (Booking)', cancelButtonText: 'Đóng'
        });
 
-       if (isConfirmed) { // Check-in ngay
+       if (isConfirmed) { 
            const { value: guestName } = await Swal.fire({ input: 'text', title: 'Tên khách', inputValue: 'Khách lẻ' });
            if (guestName) {
                await reservationStore.createReservation({
@@ -289,7 +273,7 @@ const handleTableClick = async (table: any) => {
                });
                Swal.fire('Thành công', 'Bàn đã chuyển sang CÓ KHÁCH', 'success');
            }
-       } else if (value === false) { // Đặt trước
+       } else if (value === false) { 
            staffInitData.date = dateStr; staffInitData.time = timeStr;
            showCreateModal.value = true;
        }
@@ -309,22 +293,17 @@ const handleTableClick = async (table: any) => {
    }
 };
 
-// Form handling
 const openCreateModal = () => { selectedTableForAction.value = null; showCreateModal.value = true; };
 const closeModal = () => { showCreateModal.value = false; selectedTableForAction.value = null; };
 const handleStaffCreateReservation = async (formData: any) => {
     await reservationStore.createReservation({
-        ...formData,
-        reservation_time: `${formData.date}T${formData.time}`,
-        tableId: selectedTableForAction.value?.id,
-        tableName: selectedTableForAction.value?.name,
+        ...formData, reservation_time: `${formData.date}T${formData.time}`,
+        tableId: selectedTableForAction.value?.id, tableName: selectedTableForAction.value?.name,
         isAdmin: true, initialStatus: 'CONFIRMED'
     });
-    closeModal();
-    Swal.fire('Thành công', 'Đã tạo đơn', 'success');
+    closeModal(); Swal.fire('Thành công', 'Đã tạo đơn', 'success');
 };
 
-// Helpers
 const getTabName = (tab: string) => tab === 'RESERVATIONS' ? 'Quản Lý Đặt Bàn' : 'Sơ Đồ Khu Vực';
 const getUserInitial = computed(() => authStore.user?.name.charAt(0).toUpperCase() || 'S');
 const todayString = computed(() => new Date().toLocaleDateString('vi-VN'));
@@ -337,17 +316,12 @@ const toggleUserMenu = () => { showUserMenu.value = !showUserMenu.value; };
 const closeUserMenu = () => { showUserMenu.value = false; };
 const handleLogout = () => { authStore.logout(); router.push('/'); };
 
-onMounted(() => {
-  reservationStore.fetchReservations();
-  refreshMap();
-});
+onMounted(() => { reservationStore.fetchReservations(); refreshMap(); });
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 .dashboard-layout { display: flex; height: 100vh; background-color: #f4f6f8; font-family: 'Montserrat', sans-serif; color: #333; }
-
-/* Sidebar & Header Styles Copy from previous version */
 .sidebar { width: 260px; background: #1a1a1a; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
 .brand { height: 70px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
 .brand-logo { height: 32px; margin-right: 12px; filter: brightness(0) invert(1); }
@@ -382,8 +356,6 @@ onMounted(() => {
 .filter-tab.active { background: #fff; color: #333; }
 .count-badge { background: #95a5a6; color: #fff; font-size: 0.7rem; padding: 1px 5px; border-radius: 10px; margin-left: 5px; }
 .btn-create { margin-left: auto; background: #27ae60; color: #fff; border: none; padding: 0 20px; height: 42px; border-radius: 8px; font-weight: 600; cursor: pointer; }
-
-/* Table Styles */
 .table-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); overflow: hidden; }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th { background: #f8f9fa; text-align: left; padding: 15px; font-size: 0.8rem; text-transform: uppercase; color: #7f8c8d; border-bottom: 2px solid #eee; }
@@ -397,12 +369,17 @@ onMounted(() => {
 .status-badge.cancelled { background: #f8d7da; color: #721c24; }
 .note-text { font-size: 0.75rem; color: #c0392b; margin-top: 4px; font-style: italic; max-width: 150px; }
 
-/* MAP STYLES */
-.map-toolbar { justify-content: space-between; align-items: flex-end; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 20px; }
-.map-filters { display: flex; gap: 15px; align-items: center; }
-.mf-item { display: flex; gap: 5px; align-items: center; font-size: 0.9rem; }
-.mf-item input, .mf-item select { padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; }
-.btn-now { background: #34495e; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+/* MAP STYLES UPDATE */
+.map-toolbar-custom { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+.map-filters-styled { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
+.mf-item { display: flex; flex-direction: column; }
+.mf-item label { font-size: 0.75rem; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase; }
+.mf-item input, .mf-item select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 0.9rem; outline: none; }
+.time-group { display: flex; align-items: center; gap: 5px; }
+.minute-select { width: 70px; }
+.colon { font-weight: bold; }
+.btn-dark-flat { height: 38px; padding: 0 20px; background: #34495e; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; text-transform: uppercase; font-size: 0.85rem; }
+.btn-dark-flat:hover { background: #2c3e50; }
 .map-legend { display: flex; gap: 15px; font-size: 0.85rem; }
 
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
@@ -410,7 +387,6 @@ onMounted(() => {
 .dot.pending { background: #f1c40f; }
 .dot.reserved { background: #e74c3c; }
 .dot.occupied { background: #8e44ad; }
-
 .staff-map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; padding-bottom: 50px; }
 .staff-table-card { background: #fff; border: 2px solid #eee; border-radius: 10px; padding: 15px; cursor: pointer; transition: 0.2s; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
 .staff-table-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
@@ -433,6 +409,5 @@ onMounted(() => {
 .btn-primary { background: #3498db; color: #fff; }
 .btn-success { background: #27ae60; color: #fff; }
 .btn-danger-outline { border: 1px solid #e74c3c; background: #fff; color: #e74c3c; }
-
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(241, 196, 15, 0); } 100% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0); } }
 </style>
