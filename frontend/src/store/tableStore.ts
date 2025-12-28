@@ -1,65 +1,63 @@
+// src/store/tableStore.ts
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
-// Định nghĩa cấu trúc dữ liệu Bàn
 export interface Table {
   id: number;
-  name: string;
-  x: number;      // Tọa độ X (%)
-  y: number;      // Tọa độ Y (%)
+  label: string;
   seats: number;
   status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'DISABLED';
-  type: 'CIRCLE' | 'SQUARE' | 'RECTANGLE'; // Hình dáng
-  area?: string;
+  // Đã xóa trường zone
 }
 
 export const useTableStore = defineStore('table', () => {
-  // 1. Dữ liệu bàn (Mock Initial Data)
+  // 1. STATE: Mock Data (Xóa zone)
   const tables = ref<Table[]>([
-    { id: 1, name: 'Bàn 01', x: 10, y: 15, seats: 2, status: 'AVAILABLE', type: 'CIRCLE', area: 'Ngoài trời' },
-    { id: 2, name: 'Bàn 02', x: 30, y: 15, seats: 4, status: 'OCCUPIED', type: 'SQUARE', area: 'Ngoài trời' },
-    { id: 3, name: 'VIP 1', x: 80, y: 30, seats: 8, status: 'RESERVED', type: 'RECTANGLE', area: 'Phòng lạnh' },
-    { id: 4, name: 'Bàn 03', x: 10, y: 50, seats: 2, status: 'AVAILABLE', type: 'CIRCLE', area: 'Ngoài trời' },
-    { id: 5, name: 'Bàn 04', x: 50, y: 50, seats: 4, status: 'AVAILABLE', type: 'SQUARE', area: 'Sảnh chính' },
+    { id: 1, label: 'Bàn 01', seats: 4, status: 'AVAILABLE' },
+    { id: 2, label: 'Bàn 02', seats: 2, status: 'OCCUPIED' },
+    { id: 3, label: 'Bàn 03', seats: 6, status: 'RESERVED' },
+    { id: 4, label: 'Bàn 04', seats: 4, status: 'AVAILABLE' },
+    { id: 5, label: 'Bàn 05', seats: 8, status: 'DISABLED' },
   ]);
 
-  // 2. Kênh giao tiếp Real-time (Giả lập Socket)
-  const channel = new BroadcastChannel('cafe_realtime_channel');
-
-  // Lắng nghe sự kiện từ tab khác
-  channel.onmessage = (event) => {
-    const { action, payload } = event.data;
-    if (action === 'UPDATE_TABLES') {
-      tables.value = payload; // Cập nhật ngay lập tức UI
-    }
+  const syncToStorage = () => {
+    localStorage.setItem('cafes_tables_sync', JSON.stringify(tables.value));
   };
 
-  // Hàm gửi tín hiệu cho các tab khác
-  const broadcastChange = () => {
-    channel.postMessage({
-      action: 'UPDATE_TABLES',
-      payload: JSON.parse(JSON.stringify(tables.value))
+  // 2. ACTIONS
+  const initRealTimeListener = () => {
+    const saved = localStorage.getItem('cafes_tables_sync');
+    if (saved) tables.value = JSON.parse(saved);
+
+    window.addEventListener('storage', (event) => {
+      if (event.key === 'cafes_tables_sync' && event.newValue) {
+        tables.value = JSON.parse(event.newValue);
+      }
     });
   };
 
-  // 3. Actions (Thao tác dữ liệu)
-  const addTable = (table: Table) => {
-    tables.value.push(table);
-    broadcastChange();
+  const addTable = (newTable: Omit<Table, 'id' | 'status'>) => {
+    const maxId = tables.value.length > 0 ? Math.max(...tables.value.map(t => t.id)) : 0;
+    tables.value.push({
+      id: maxId + 1,
+      ...newTable,
+      status: 'AVAILABLE'
+    });
+    syncToStorage();
   };
 
-  const updateTable = (updatedTable: Table) => {
-    const index = tables.value.findIndex(t => t.id === updatedTable.id);
+  const updateTable = (id: number, updates: Partial<Table>) => {
+    const index = tables.value.findIndex(t => t.id === id);
     if (index !== -1) {
-      tables.value[index] = updatedTable;
-      broadcastChange();
+      tables.value[index] = { ...tables.value[index], ...updates };
+      syncToStorage();
     }
   };
 
   const deleteTable = (id: number) => {
     tables.value = tables.value.filter(t => t.id !== id);
-    broadcastChange();
+    syncToStorage();
   };
 
-  return { tables, addTable, updateTable, deleteTable };
+  return { tables, initRealTimeListener, addTable, updateTable, deleteTable };
 });

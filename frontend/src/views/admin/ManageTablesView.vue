@@ -1,188 +1,295 @@
+<template>
+  <div class="manage-page">
+    
+    <div class="page-header">
+      <div class="header-left">
+        <h2>Sơ đồ Bàn (Admin)</h2>
+        <p class="subtitle">Quản lý thiết lập và trạng thái vận hành bàn</p>
+      </div>
+      
+      <button v-if="!isPastMode" class="btn-add" @click="openAddModal">
+        <span class="plus-icon">+</span> Thêm bàn mới
+      </button>
+    </div>
+
+    <div v-if="isPastMode" class="history-banner">
+      ⚠️ Bạn đang xem trạng thái quá khứ. Các chức năng chỉnh sửa đã bị khóa.
+    </div>
+
+    <div class="toolbar-container">
+      <div class="tool-group time-group">
+        <label>🕒 Thời điểm xem:</label>
+        <input 
+          type="datetime-local" 
+          v-model="selectedTime" 
+          class="time-input"
+          :class="{ 'is-past': isPastMode }"
+        >
+        <button v-if="isPastMode" class="btn-reset" @click="resetToNow">
+          Về hiện tại
+        </button>
+      </div>
+
+      <div class="tool-group filter-group">
+        <label>🌪 Lọc trạng thái:</label>
+        <select v-model="filterStatus" class="filter-select">
+          <option value="ALL">Tất cả</option>
+          <option value="AVAILABLE">Trống</option>
+          <option value="PENDING">Chờ duyệt</option>
+          <option value="RESERVED">Đã đặt</option>
+          <option value="OCCUPIED">Có khách</option>
+          <option value="DISABLED">Bảo trì</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="status-legend">
+      <div class="legend-item available"><span class="dot"></span> Trống</div>
+      <div class="legend-item pending"><span class="dot"></span> Chờ duyệt</div>
+      <div class="legend-item reserved"><span class="dot"></span> Đã đặt</div>
+      <div class="legend-item occupied"><span class="dot"></span> Có khách</div>
+      <div class="legend-item disabled"><span class="dot"></span> Bảo trì</div>
+    </div>
+
+    <div class="map-area">
+      <TableMap 
+        :tables="filteredTables" 
+        mode="admin" 
+        :readOnly="isPastMode"
+        @click-table="handleAdminAction" 
+      />
+    </div>
+
+  </div>
+</template>
+
 <script setup lang="ts">
-import { ref } from 'vue';
-import TableMap from '../../components/map/TableMap.vue';
-import AppButton from '../../components/common/AppButton.vue';
-import { useTableStore, type Table } from '../../store/tableStore';
+import { ref, computed, onMounted } from 'vue';
+import { useTableStore } from '../../store/tableStore'; // Import tương đối
+import TableMap from '../../components/map/TableMap.vue'; // Import tương đối
+import Swal from 'sweetalert2';
 
-const tableStore = useTableStore();
-const isModalOpen = ref(false);
-const editingTable = ref<Partial<Table>>({}); // Object tạm để binding form
+const store = useTableStore();
+onMounted(() => store.initRealTimeListener());
 
-// Mở form thêm mới
-const openAddModal = () => {
-  editingTable.value = {
-    id: Date.now(), // ID tạm thời
-    name: 'Bàn Mới',
-    x: 5, y: 5, // Vị trí mặc định ở góc trên trái
-    seats: 4,
-    status: 'AVAILABLE',
-    type: 'SQUARE',
-    area: 'Trong nhà'
-  };
-  isModalOpen.value = true;
+// --- LOGIC THỜI GIAN ---
+const getNowString = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
 };
+const selectedTime = ref(getNowString());
+const resetToNow = () => selectedTime.value = getNowString();
 
-// Mở form sửa khi click vào bàn
-const handleEditTable = (table: Table) => {
-  editingTable.value = { ...table }; // Clone ra để không sửa trực tiếp vào store
-  isModalOpen.value = true;
-};
+const isPastMode = computed(() => {
+  const selected = new Date(selectedTime.value).getTime();
+  const now = new Date().getTime();
+  return selected < (now - 5 * 60 * 1000); 
+});
 
-// Lưu thông tin
-const saveTable = () => {
-  if (editingTable.value.id) {
-    // Check nếu ID đã tồn tại thì là Update, chưa thì là Add
-    const exists = tableStore.tables.some(t => t.id === editingTable.value.id);
-    if (exists) {
-      tableStore.updateTable(editingTable.value as Table);
-    } else {
-      tableStore.addTable(editingTable.value as Table);
+// --- LOGIC BỘ LỌC ---
+const filterStatus = ref('ALL');
+const filteredTables = computed(() => {
+  return store.tables.filter(table => {
+    return filterStatus.value === 'ALL' || table.status === filterStatus.value;
+  });
+});
+
+// --- ACTIONS ---
+
+// 1. Thêm bàn mới
+const openAddModal = async () => {
+  const { value: form } = await Swal.fire({
+    title: 'Thêm bàn mới',
+    html: `
+      <input id="swal-label" class="swal2-input" placeholder="Tên bàn">
+      <input id="swal-seats" type="number" min="1" class="swal2-input" placeholder="Số ghế">
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'Tạo bàn',
+    preConfirm: () => {
+      const label = (document.getElementById('swal-label') as HTMLInputElement).value;
+      const seats = parseInt((document.getElementById('swal-seats') as HTMLInputElement).value);
+      if (!label || isNaN(seats) || seats < 1) {
+        return Swal.showValidationMessage('Vui lòng nhập tên và số ghế lớn hơn 0');
+      }
+      return { label, seats };
     }
+  });
+
+  if (form) {
+    store.addTable(form);
+    Swal.fire({ icon: 'success', title: 'Đã thêm bàn!', timer: 1000, showConfirmButton: false });
   }
-  isModalOpen.value = false;
 };
 
-// Xóa bàn
-const handleDelete = () => {
-  if (editingTable.value.id && confirm('Bạn có chắc muốn xóa bàn này?')) {
-    tableStore.deleteTable(editingTable.value.id);
-    isModalOpen.value = false;
+// 2. Logic Admin click bàn (Xử lý chặt chẽ)
+const handleAdminAction = async (table: any) => {
+  // CHỈ CHO PHÉP SỬA NẾU LÀ 'AVAILABLE' HOẶC 'DISABLED'
+  const editableStatus = ['AVAILABLE', 'DISABLED'];
+  
+  if (!editableStatus.includes(table.status)) {
+    return Swal.fire({
+      icon: 'warning',
+      title: 'Không thể can thiệp',
+      text: `Bàn đang ở trạng thái "${table.status}". Chỉ bàn Trống hoặc Bảo trì mới có thể thay đổi thiết lập.`,
+      confirmButtonText: 'Đã hiểu'
+    });
+  }
+
+  // Mở Popup chọn hành động
+  const { value: action } = await Swal.fire({
+    title: `Quản lý ${table.label}`,
+    text: `Trạng thái hiện tại: ${table.status}`,
+    showDenyButton: true,
+    showCancelButton: true,
+    confirmButtonText: '📝 Sửa thông tin',
+    denyButtonText: '🗑️ Xóa bàn',
+    cancelButtonText: 'Đóng',
+    
+    // Custom Class cho đẹp
+    customClass: {
+      actions: 'swal-custom-actions',
+      confirmButton: 'btn-swal-edit',
+      denyButton: 'btn-swal-delete',
+      cancelButton: 'btn-swal-cancel'
+    },
+    buttonsStyling: false // Tắt style mặc định
+  });
+
+  if (action === true) {
+    // Popup Sửa (Chỉ cho chọn Trống hoặc Bảo trì)
+    const { value: updates } = await Swal.fire({
+      title: 'Cập nhật bàn',
+      html: `
+        <div style="text-align:left">
+          <label>Tên bàn:</label>
+          <input id="edit-label" class="swal2-input" value="${table.label}">
+          <label>Số ghế:</label>
+          <input id="edit-seats" type="number" min="1" class="swal2-input" value="${table.seats}">
+          <label>Trạng thái:</label>
+          <select id="edit-status" class="swal2-select" style="width:100%; margin-top:5px;">
+            <option value="AVAILABLE" ${table.status === 'AVAILABLE' ? 'selected' : ''}>🟢 Trống (Available)</option>
+            <option value="DISABLED" ${table.status === 'DISABLED' ? 'selected' : ''}>⚫ Bảo trì (Disabled)</option>
+          </select>
+        </div>
+      `,
+      focusConfirm: false,
+      preConfirm: () => {
+        const label = (document.getElementById('edit-label') as HTMLInputElement).value;
+        const seats = parseInt((document.getElementById('edit-seats') as HTMLInputElement).value);
+        const status = (document.getElementById('edit-status') as HTMLSelectElement).value;
+        
+        if (!label || isNaN(seats) || seats < 1) {
+          return Swal.showValidationMessage('Thông tin không hợp lệ');
+        }
+        return { label, seats, status };
+      }
+    });
+
+    if (updates) {
+      store.updateTable(table.id, updates);
+      Swal.fire({ icon: 'success', title: 'Cập nhật thành công', timer: 1000, showConfirmButton: false });
+    }
+
+  } else if (action === false) {
+    // Xóa bàn
+    Swal.fire({
+      title: 'Xóa bàn này?',
+      text: "Hành động này không thể hoàn tác!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa luôn!',
+      confirmButtonColor: '#d33'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        store.deleteTable(table.id);
+        Swal.fire('Đã xóa!', '', 'success');
+      }
+    });
   }
 };
 </script>
 
-<template>
-  <div class="manage-tables-view">
-    <div class="header-actions">
-      <div class="title-section">
-        <h3>Sơ đồ & Vị trí Bàn</h3>
-        <p class="subtitle">Kéo thả để sắp xếp vị trí bàn trong quán</p>
-      </div>
-      
-      <div class="controls">
-        <div class="legend">
-          <span class="dot available"></span> Trống
-          <span class="dot reserved"></span> Đặt trước
-          <span class="dot occupied"></span> Đang dùng
-        </div>
-        <AppButton variant="primary" @click="openAddModal">
-          + Thêm Bàn Mới
-        </AppButton>
-      </div>
-    </div>
-
-    <div class="map-wrapper">
-      <TableMap 
-        mode="ADMIN" 
-        @edit-table="handleEditTable" 
-      />
-    </div>
-
-    <div v-if="isModalOpen" class="modal-overlay" @click.self="isModalOpen = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>{{ editingTable.id ? 'Chỉnh sửa bàn' : 'Thêm bàn mới' }}</h3>
-          <button class="close-btn" @click="isModalOpen = false">✕</button>
-        </div>
-        
-        <div class="form-body">
-          <div class="form-group">
-            <label>Tên bàn</label>
-            <input v-model="editingTable.name" type="text" placeholder="Ví dụ: Bàn 01" />
-          </div>
-          
-          <div class="row">
-            <div class="form-group">
-              <label>Số ghế</label>
-              <input v-model.number="editingTable.seats" type="number" min="1" />
-            </div>
-            <div class="form-group">
-              <label>Khu vực</label>
-              <select v-model="editingTable.area">
-                <option>Trong nhà</option>
-                <option>Ngoài trời</option>
-                <option>Phòng lạnh</option>
-                <option>Sân thượng</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Hình dáng</label>
-            <div class="shape-options">
-              <label :class="{ active: editingTable.type === 'CIRCLE' }">
-                <input type="radio" value="CIRCLE" v-model="editingTable.type"> Tròn
-              </label>
-              <label :class="{ active: editingTable.type === 'SQUARE' }">
-                <input type="radio" value="SQUARE" v-model="editingTable.type"> Vuông
-              </label>
-              <label :class="{ active: editingTable.type === 'RECTANGLE' }">
-                <input type="radio" value="RECTANGLE" v-model="editingTable.type"> Chữ nhật
-              </label>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Trạng thái hiện tại</label>
-            <select v-model="editingTable.status" class="status-select" :class="editingTable.status?.toLowerCase()">
-              <option value="AVAILABLE">🟢 Trống (Available)</option>
-              <option value="RESERVED">🟡 Đã đặt (Reserved)</option>
-              <option value="OCCUPIED">🔴 Đang dùng (Occupied)</option>
-              <option value="DISABLED">⚪ Bảo trì (Disabled)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn-delete" @click="handleDelete" v-if="editingTable.id">Xóa bàn</button>
-          <div class="right-actions">
-            <button class="btn-cancel" @click="isModalOpen = false">Hủy</button>
-            <button class="btn-save" @click="saveTable">Lưu thay đổi</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <style scoped>
-.manage-tables-view { display: flex; flex-direction: column; height: 100%; gap: 15px; }
-.header-actions { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-.title-section h3 { margin: 0; color: #2c3e50; }
-.subtitle { margin: 5px 0 0; font-size: 0.85rem; color: #7f8c8d; }
+/* CSS CỤC BỘ (Layout, Toolbar, Legend...) */
+.manage-page {
+  padding: 24px;
+  background-color: #f4f6f8;
+  min-height: 100vh;
+  font-family: 'Segoe UI', sans-serif;
+}
+.page-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+}
+.header-left h2 { margin: 0; font-size: 1.8rem; color: #2c3e50; }
+.subtitle { color: #7f8c8d; margin: 4px 0 0; font-size: 0.95rem; }
 
-.controls { display: flex; align-items: center; gap: 20px; }
-.legend { display: flex; gap: 15px; font-size: 0.9rem; color: #555; }
-.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-.available { background: #2ecc71; } .reserved { background: #f1c40f; } .occupied { background: #e74c3c; }
+.btn-add {
+  background: #2ecc71; color: white; border: none; padding: 10px 20px;
+  border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  transition: transform 0.2s;
+}
+.btn-add:hover { background: #27ae60; transform: translateY(-2px); }
 
-.map-wrapper { flex: 1; border-radius: 12px; overflow: hidden; border: 1px solid #ddd; background: white; }
+.toolbar-container {
+  background: white; padding: 16px 20px; border-radius: 12px;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 16px;
+}
+.tool-group { display: flex; align-items: center; gap: 10px; }
+.tool-group label { font-weight: 600; color: #34495e; font-size: 0.9rem; }
+.time-input, .filter-select {
+  padding: 8px 12px; border: 1px solid #dfe6e9; border-radius: 6px; outline: none;
+}
+.time-input.is-past { border-color: #e67e22; background: #fff3e0; }
+.btn-reset {
+  font-size: 0.8rem; color: #e67e22; background: none; border: 1px solid #e67e22; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+}
 
-/* Modal Styles */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(2px); }
-.modal-content { background: white; width: 400px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; animation: slideDown 0.2s ease-out; }
-.modal-header { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; }
-.modal-header h3 { margin: 0; font-size: 1.1rem; }
-.close-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #999; }
+.status-legend {
+  display: flex; justify-content: center; gap: 24px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 500; color: #555;
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.legend-item.available .dot { background-color: #20c997; }
+.legend-item.pending .dot { background-color: #7950f2; }
+.legend-item.occupied .dot { background-color: #fa5252; }
+.legend-item.reserved .dot { background-color: #fab005; }
+.legend-item.disabled .dot { background-color: #868e96; }
 
-.form-body { padding: 20px; }
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; color: #34495e; }
-.form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-.row { display: flex; gap: 10px; }
-.row .form-group { flex: 1; }
+.history-banner {
+  background: #fff3cd; color: #856404; text-align: center; padding: 10px;
+  border-radius: 8px; margin-bottom: 20px; font-weight: bold; border: 1px solid #ffeeba;
+}
+.map-area {
+  background: white; padding: 20px; border-radius: 16px; min-height: 400px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+</style>
 
-.shape-options { display: flex; gap: 10px; }
-.shape-options label { flex: 1; border: 1px solid #ddd; text-align: center; padding: 8px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
-.shape-options label:hover { background: #f9f9f9; }
-.shape-options label.active { border-color: #42b983; color: #42b983; background: #e8f5e9; font-weight: 600; }
-.shape-options input { display: none; }
+<style>
+.swal-custom-actions {
+    gap: 15px !important; margin-top: 25px !important;
+}
+.btn-swal-edit, .btn-swal-delete, .btn-swal-cancel {
+    padding: 12px 24px !important; font-weight: 600 !important; border-radius: 10px !important;
+    font-size: 1rem !important; border: none !important; cursor: pointer !important;
+    transition: all 0.2s ease-in-out !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+    outline: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
+}
+.btn-swal-edit:hover, .btn-swal-delete:hover, .btn-swal-cancel:hover {
+    transform: translateY(-3px) !important;
+}
+/* Màu sắc */
+.btn-swal-edit { background: linear-gradient(135deg, #228be6, #1c7ed6) !important; color: white !important; }
+.btn-swal-edit:hover { box-shadow: 0 8px 15px rgba(34, 139, 230, 0.3) !important; }
 
-.modal-footer { padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee; display: flex; justify-content: space-between; }
-.right-actions { display: flex; gap: 10px; }
-.btn-save { background: #42b983; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; }
-.btn-cancel { background: white; border: 1px solid #ddd; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
-.btn-delete { background: #ff7675; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+.btn-swal-delete { background: linear-gradient(135deg, #fa5252, #e03131) !important; color: white !important; }
+.btn-swal-delete:hover { box-shadow: 0 8px 15px rgba(250, 82, 82, 0.3) !important; }
 
-@keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.btn-swal-cancel { background-color: #e9ecef !important; color: #495057 !important; }
+.btn-swal-cancel:hover { background-color: #dee2e6 !important; color: #212529 !important; }
 </style>

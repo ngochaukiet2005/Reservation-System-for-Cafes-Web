@@ -1,162 +1,137 @@
-<script setup lang="ts">
-import { useTableStore, type Table } from '../../store/tableStore';
-
-const props = defineProps<{
-  mode: 'ADMIN' | 'STAFF' | 'CUSTOMER'; // Chế độ hiển thị
-}>();
-
-const emit = defineEmits(['select-table', 'edit-table']);
-const tableStore = useTableStore();
-
-// --- Logic Kéo Thả (Chỉ dành cho Admin) ---
-const startDrag = (event: DragEvent, table: Table) => {
-  if (props.mode !== 'ADMIN') return;
-  if (event.dataTransfer) {
-    event.dataTransfer.setData('tableId', table.id.toString());
-    event.dataTransfer.effectAllowed = 'move';
-  }
-};
-
-const onDrop = (event: DragEvent) => {
-  if (props.mode !== 'ADMIN') return;
-  const tableId = Number(event.dataTransfer?.getData('tableId'));
-  const table = tableStore.tables.find(t => t.id === tableId);
-  
-  if (table) {
-    // Tính toán tọa độ % mới dựa trên khung chứa (Map Container)
-    const mapRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    
-    // Tính % tương đối để responsive trên mọi màn hình
-    let newX = ((event.clientX - mapRect.left) / mapRect.width) * 100;
-    let newY = ((event.clientY - mapRect.top) / mapRect.height) * 100;
-
-    // Giới hạn không cho kéo ra ngoài khung (0% - 95%)
-    newX = Math.max(0, Math.min(newX, 90));
-    newY = Math.max(0, Math.min(newY, 90));
-
-    // Cập nhật Store
-    tableStore.updateTable({ ...table, x: newX, y: newY });
-  }
-};
-
-// --- Xử lý Click ---
-const handleTableClick = (table: Table) => {
-  // Admin: Click để sửa thông tin
-  if (props.mode === 'ADMIN') {
-    emit('edit-table', table);
-  } 
-  // Customer: Chỉ được chọn bàn trống
-  else if (props.mode === 'CUSTOMER') {
-    if (table.status === 'AVAILABLE') emit('select-table', table);
-    else alert('Bàn này đã có người đặt hoặc đang sử dụng!');
-  } 
-  // Staff: Chọn bàn để xử lý (Order/Check-in...)
-  else {
-    emit('select-table', table);
-  }
-};
-
-// --- Helper Màu Sắc ---
-const getStatusColor = (status: string) => {
-  switch(status) {
-    case 'AVAILABLE': return '#2ecc71'; // Xanh lá
-    case 'RESERVED': return '#f1c40f';  // Vàng
-    case 'OCCUPIED': return '#e74c3c';  // Đỏ
-    case 'DISABLED': return '#95a5a6';  // Xám
-    default: return '#bdc3c7';
-  }
-};
-</script>
-
 <template>
-  <div 
-    class="cafe-map" 
-    @dragover.prevent 
-    @drop="onDrop"
-  >
-    <div class="grid-lines" v-if="mode === 'ADMIN'"></div>
+  <div class="map-wrapper">
+    <div v-if="tables.length === 0" class="empty-state">
+      <span class="icon">🔍</span>
+      <p>Không tìm thấy bàn nào phù hợp.</p>
+    </div>
 
-    <div 
-      v-for="table in tableStore.tables" 
-      :key="table.id"
-      class="table-node"
-      :class="[table.type.toLowerCase(), { 'draggable': mode === 'ADMIN' }]"
-      :style="{ 
-        left: table.x + '%', 
-        top: table.y + '%',
-        backgroundColor: getStatusColor(table.status)
-      }"
-      :draggable="mode === 'ADMIN'"
-      @dragstart="startDrag($event, table)"
-      @click.stop="handleTableClick(table)"
-    >
-      <span class="table-name">{{ table.name }}</span>
-      
-      <div class="seats-badge">
-        <span>{{ table.seats }}</span>
-        <span class="icon-user">👤</span>
-      </div>
+    <div v-else class="grid-layout">
+      <div 
+        v-for="table in tables" 
+        :key="table.id"
+        class="table-card"
+        :class="[
+          (table.status || '').toLowerCase(), 
+          { 'is-readonly': readOnly }
+        ]"
+        @click="handleClick(table)"
+      >
+        <div class="card-body">
+          <span class="table-icon">☕</span>
+          <h3 class="table-name">{{ table.label }}</h3>
+          <p class="table-info">{{ table.seats }} ghế</p>
+        </div>
 
-      <div class="tooltip" v-if="mode !== 'ADMIN'">
-        {{ table.area }} - {{ table.status }}
+        <div class="status-indicator">
+          {{ getStatusLabel(table.status) }}
+        </div>
       </div>
     </div>
   </div>
 </template>
 
+<script setup lang="ts">
+import { defineProps, defineEmits } from 'vue';
+import type { Table } from '../../store/tableStore';
+
+const props = defineProps<{
+  tables: Table[];
+  mode: 'admin' | 'staff' | 'customer';
+  readOnly?: boolean; // Thêm prop này để chặn click
+}>();
+
+const emit = defineEmits(['click-table']);
+
+const getStatusLabel = (s: string) => {
+  const map: any = { AVAILABLE: 'Trống', RESERVED: 'Đã đặt', OCCUPIED: 'Có khách', DISABLED: 'Bảo trì' };
+  return map[s] || s;
+};
+
+const handleClick = (table: Table) => {
+  // Nếu đang ở chế độ chỉ xem (quá khứ) thì không làm gì cả
+  if (props.readOnly) return;
+
+  // Logic cũ
+  if (props.mode === 'admin') emit('click-table', table);
+  else if (props.mode === 'customer' && table.status === 'AVAILABLE') emit('click-table', table);
+  else if (props.mode === 'staff') emit('click-table', table);
+};
+</script>
+
 <style scoped>
-.cafe-map {
-  width: 100%;
-  height: 600px; /* Chiều cao cố định của bản đồ */
-  background-color: #fdfbf7; /* Màu nền nhẹ */
-  border: 2px solid #e0e0e0;
+.map-wrapper {
+  background: #fff;
   border-radius: 12px;
+  padding: 20px;
+  min-height: 400px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f1f3f5;
+}
+
+.grid-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 20px;
+}
+
+.table-card {
   position: relative;
+  aspect-ratio: 1;
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
   overflow: hidden;
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
-  user-select: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-.grid-lines {
-  position: absolute; inset: 0; pointer-events: none;
-  background-image: linear-gradient(#eee 1px, transparent 1px), linear-gradient(90deg, #eee 1px, transparent 1px);
-  background-size: 40px 40px; opacity: 0.6;
+/* Hiệu ứng khi hover (chỉ khi không readonly) */
+.table-card:not(.is-readonly):hover { 
+  transform: translateY(-4px); 
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); 
 }
 
-/* --- Style cho Table Node --- */
-.table-node {
+/* Style cho Readonly (Quá khứ) */
+.table-card.is-readonly {
+  opacity: 0.8;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+
+/* Status Colors */
+.table-card.available { border-color: #20c997; }
+.table-card.available .table-icon { color: #20c997; }
+.table-card.available .status-indicator { background: #e6fcf5; color: #0ca678; }
+
+.table-card.occupied { border-color: #fa5252; background: #fff5f5; }
+.table-card.occupied .table-icon { color: #fa5252; }
+.table-card.occupied .status-indicator { background: #ffe3e3; color: #c92a2a; }
+
+.table-card.reserved { border-color: #fab005; background: #fff9db; }
+.table-card.reserved .table-icon { color: #fab005; }
+.table-card.reserved .status-indicator { background: #fff3bf; color: #f08c00; }
+
+.table-card.disabled { border-color: #ced4da; background: #f8f9fa; opacity: 0.7; }
+.table-card.disabled .status-indicator { background: #e9ecef; color: #495057; }
+
+.card-body { text-align: center; }
+.table-icon { font-size: 1.5rem; display: block; margin-bottom: 5px; }
+.table-name { font-size: 1.1rem; font-weight: 700; margin: 0; color: #343a40; }
+.table-info { font-size: 0.8rem; color: #868e96; margin: 2px 0 0; }
+
+.status-indicator {
   position: absolute;
-  transform: translate(0, 0); /* Mặc định */
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  color: white; font-weight: 600; font-size: 0.85rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-  cursor: pointer; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  z-index: 10; border: 2px solid rgba(255,255,255,0.3);
+  bottom: 0; left: 0; right: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 4px 0;
 }
 
-.table-node:hover { transform: scale(1.1); z-index: 100; box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
-.table-node.draggable { cursor: move; }
-.table-node.draggable:active { cursor: grabbing; transform: scale(1.05); opacity: 0.9; }
-
-/* Các hình dáng bàn */
-.circle { width: 80px; height: 80px; border-radius: 50%; }
-.square { width: 80px; height: 80px; border-radius: 12px; }
-.rectangle { width: 140px; height: 80px; border-radius: 12px; }
-
-.table-name { text-shadow: 0 1px 2px rgba(0,0,0,0.3); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; }
-
-.seats-badge { 
-  font-size: 0.75rem; background: rgba(0,0,0,0.2); 
-  padding: 2px 8px; border-radius: 12px; 
-  display: flex; align-items: center; gap: 2px;
-}
-.icon-user { font-size: 0.7rem; }
-
-/* Tooltip đơn giản */
-.tooltip {
-  position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%);
-  background: #333; color: white; padding: 5px 10px; border-radius: 4px;
-  font-size: 0.75rem; white-space: nowrap; opacity: 0; pointer-events: none; transition: 0.2s;
-}
-.table-node:hover .tooltip { opacity: 1; bottom: 120%; }
+.empty-state { text-align: center; color: #adb5bd; margin-top: 50px; }
+.empty-state .icon { font-size: 3rem; }
 </style>
