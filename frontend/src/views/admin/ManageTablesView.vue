@@ -65,8 +65,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useTableStore } from '../../store/tableStore'; // Import tương đối
-import TableMap from '../../components/map/TableMap.vue'; // Import tương đối
+import { useTableStore } from '../../store/tableStore';
+import TableMap from '../../components/map/TableMap.vue';
 import Swal from 'sweetalert2';
 
 const store = useTableStore();
@@ -96,8 +96,6 @@ const filteredTables = computed(() => {
 });
 
 // --- ACTIONS ---
-
-// 1. Thêm bàn mới
 const openAddModal = async () => {
   const { value: form } = await Swal.fire({
     title: 'Thêm bàn mới',
@@ -123,9 +121,7 @@ const openAddModal = async () => {
   }
 };
 
-// 2. Logic Admin click bàn (Xử lý chặt chẽ)
 const handleAdminAction = async (table: any) => {
-  // CHỈ CHO PHÉP SỬA NẾU LÀ 'AVAILABLE' HOẶC 'DISABLED'
   const editableStatus = ['AVAILABLE', 'DISABLED'];
   
   if (!editableStatus.includes(table.status)) {
@@ -137,7 +133,6 @@ const handleAdminAction = async (table: any) => {
     });
   }
 
-  // Mở Popup chọn hành động
   const { value: action } = await Swal.fire({
     title: `Quản lý ${table.label}`,
     text: `Trạng thái hiện tại: ${table.status}`,
@@ -146,19 +141,16 @@ const handleAdminAction = async (table: any) => {
     confirmButtonText: '📝 Sửa thông tin',
     denyButtonText: '🗑️ Xóa bàn',
     cancelButtonText: 'Đóng',
-    
-    // Custom Class cho đẹp
     customClass: {
       actions: 'swal-custom-actions',
       confirmButton: 'btn-swal-edit',
       denyButton: 'btn-swal-delete',
       cancelButton: 'btn-swal-cancel'
     },
-    buttonsStyling: false // Tắt style mặc định
+    buttonsStyling: false
   });
 
   if (action === true) {
-    // Popup Sửa (Chỉ cho chọn Trống hoặc Bảo trì)
     const { value: updates } = await Swal.fire({
       title: 'Cập nhật bàn',
       html: `
@@ -193,7 +185,6 @@ const handleAdminAction = async (table: any) => {
     }
 
   } else if (action === false) {
-    // Xóa bàn
     Swal.fire({
       title: 'Xóa bàn này?',
       text: "Hành động này không thể hoàn tác!",
@@ -212,7 +203,6 @@ const handleAdminAction = async (table: any) => {
 </script>
 
 <style scoped>
-/* CSS CỤC BỘ (Layout, Toolbar, Legend...) */
 .manage-page {
   padding: 24px;
   background-color: #f4f6f8;
@@ -247,18 +237,20 @@ const handleAdminAction = async (table: any) => {
   font-size: 0.8rem; color: #e67e22; background: none; border: 1px solid #e67e22; padding: 4px 8px; border-radius: 4px; cursor: pointer;
 }
 
+/* UPDATE: LEGEND CSS */
 .status-legend {
   display: flex; justify-content: center; gap: 24px; margin-bottom: 20px; flex-wrap: wrap;
 }
 .legend-item {
   display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 500; color: #555;
 }
-.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.legend-item.available .dot { background-color: #20c997; }
-.legend-item.pending .dot { background-color: #7950f2; }
-.legend-item.occupied .dot { background-color: #fa5252; }
-.legend-item.reserved .dot { background-color: #fab005; }
-.legend-item.disabled .dot { background-color: #868e96; }
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
+
+.legend-item.available .dot { background-color: #20c997; } /* Teal */
+.legend-item.pending .dot { background-color: #7950f2; }   /* Purple */
+.legend-item.reserved .dot { background-color: #fab005; }  /* Yellow */
+.legend-item.occupied .dot { background-color: #fa5252; }  /* Red */
+.legend-item.disabled .dot { background-color: #868e96; }  /* Grey */
 
 .history-banner {
   background: #fff3cd; color: #856404; text-align: center; padding: 10px;
@@ -271,25 +263,18 @@ const handleAdminAction = async (table: any) => {
 </style>
 
 <style>
-.swal-custom-actions {
-    gap: 15px !important; margin-top: 25px !important;
-}
+.swal-custom-actions { gap: 15px !important; margin-top: 25px !important; }
 .btn-swal-edit, .btn-swal-delete, .btn-swal-cancel {
     padding: 12px 24px !important; font-weight: 600 !important; border-radius: 10px !important;
     font-size: 1rem !important; border: none !important; cursor: pointer !important;
     transition: all 0.2s ease-in-out !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
     outline: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
 }
-.btn-swal-edit:hover, .btn-swal-delete:hover, .btn-swal-cancel:hover {
-    transform: translateY(-3px) !important;
-}
-/* Màu sắc */
+.btn-swal-edit:hover, .btn-swal-delete:hover, .btn-swal-cancel:hover { transform: translateY(-3px) !important; }
 .btn-swal-edit { background: linear-gradient(135deg, #228be6, #1c7ed6) !important; color: white !important; }
 .btn-swal-edit:hover { box-shadow: 0 8px 15px rgba(34, 139, 230, 0.3) !important; }
-
 .btn-swal-delete { background: linear-gradient(135deg, #fa5252, #e03131) !important; color: white !important; }
 .btn-swal-delete:hover { box-shadow: 0 8px 15px rgba(250, 82, 82, 0.3) !important; }
-
 .btn-swal-cancel { background-color: #e9ecef !important; color: #495057 !important; }
 .btn-swal-cancel:hover { background-color: #dee2e6 !important; color: #212529 !important; }
 </style>
