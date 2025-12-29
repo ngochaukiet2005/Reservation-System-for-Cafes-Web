@@ -233,27 +233,17 @@
                 <span><i class="dot available"></i> Trống</span>
                 <span><i class="dot pending"></i> Chờ duyệt</span>
                 <span><i class="dot reserved"></i> Đã đặt</span>
-                <span><i class="dot occupied"></i> Đang có khách</span>
+                <span><i class="dot occupied"></i> Có khách</span>
                 <span><i class="dot maintenance"></i> Bảo trì</span>
               </div>
           </div>
 
-          <div class="staff-map-grid">
-             <div 
-               v-for="table in reservationStore.tables" 
-               :key="table.id"
-               class="staff-table-card"
-               :class="table.status.toLowerCase()"
-               @click="handleTableClick(table)"
-             >
-                <div class="table-header">
-                   <span class="t-name">{{ table.name }}</span>
-                   <span class="t-cap">👤 {{ table.capacity }}</span>
-                </div>
-                <div class="table-body">
-                   <div class="status-big">{{ getStatusLabelMap(table.status) }}</div>
-                </div>
-             </div>
+          <div class="map-container-styled">
+             <TableMap 
+               :tables="reservationStore.tables" 
+               mode="staff"
+               @click-table="handleTableClick"
+             />
           </div>
         </div>
 
@@ -287,6 +277,7 @@ import { authStore } from '../../store/authStore';
 import { reservationStore } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
 import EditProfileModal from '../../components/EditProfileModal.vue';
+import TableMap from '../../components/map/TableMap.vue'; // IMPORT
 
 const router = useRouter();
 
@@ -661,30 +652,17 @@ onMounted(() => {
 .colon { font-weight: bold; }
 .btn-dark-flat { height: 42px; padding: 0 20px; background: #34495e; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; text-transform: uppercase; font-size: 0.85rem; }
 .btn-dark-flat:hover { background: #2c3e50; }
-.map-legend { display: flex; gap: 15px; font-size: 0.85rem; }
-.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-.dot.available { background: #fff; border: 2px solid #27ae60; }
-.dot.pending { background: #f1c40f; }
-.dot.reserved { background: #e74c3c; }
-.dot.occupied { background: #8e44ad; }
-.dot.maintenance { background: #95a5a6; }
 
-.staff-map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; padding-bottom: 50px; }
-.staff-table-card { background: #fff; border: 2px solid #eee; border-radius: 10px; padding: 15px; cursor: pointer; transition: 0.2s; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
-.staff-table-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-.staff-table-card.available { border-color: #27ae60; }
-.staff-table-card.pending { background: #fffcf2; border-color: #f1c40f; animation: pulse 2s infinite; }
-.staff-table-card.reserved { background: #fff5f5; border-color: #e74c3c; }
-.staff-table-card.occupied { background: #f3e5f5; border-color: #8e44ad; }
-.staff-table-card.maintenance { background: #f8f9fa; border-color: #bdc3c7; opacity: 0.8; cursor: not-allowed; }
+/* UPDATE: LEGEND CSS ĐỒNG BỘ */
+.map-legend { display: flex; gap: 15px; font-size: 0.85rem; flex-wrap: wrap; }
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 5px; border: 1px solid rgba(0,0,0,0.1); }
+.dot.available { background: #20c997; } /* Teal */
+.dot.pending { background: #7950f2; }   /* Purple */
+.dot.reserved { background: #fab005; }  /* Yellow */
+.dot.occupied { background: #fa5252; }  /* Red */
+.dot.maintenance { background: #868e96; } /* Grey */
 
-.table-header { display: flex; justify-content: space-between; font-weight: 700; color: #555; margin-bottom: 10px; }
-.status-big { text-align: center; font-weight: 600; font-size: 0.9rem; padding: 5px; border-radius: 4px; background: rgba(0,0,0,0.03); }
-.staff-table-card.available .status-big { color: #27ae60; }
-.staff-table-card.pending .status-big { color: #f39c12; }
-.staff-table-card.reserved .status-big { color: #c0392b; }
-.staff-table-card.occupied .status-big { color: #8e44ad; }
-.staff-table-card.maintenance .status-big { color: #7f8c8d; }
+.map-container-styled { padding-bottom: 50px; }
 
 /* Custom Dropdown CSS */
 .custom-select { position: relative; height: 42px; }
@@ -710,7 +688,6 @@ onMounted(() => {
 .btn-primary { background: #3498db; color: #fff; }
 .btn-success { background: #27ae60; color: #fff; }
 .btn-danger-outline { border: 1px solid #e74c3c; background: #fff; color: #e74c3c; }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(241, 196, 15, 0); } 100% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0); } }
 .fade-slide-enter-active, .fade-slide-leave-active { transition: all 0.2s ease; }
 .fade-slide-enter-from, .fade-slide-leave-to { opacity: 0; transform: translateY(-5px); }
 </style>

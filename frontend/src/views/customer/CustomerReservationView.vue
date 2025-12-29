@@ -75,28 +75,19 @@
           <span><i class="dot selected"></i> Đang chọn</span>
           <span><i class="dot pending"></i> Chờ duyệt</span>
           <span><i class="dot reserved"></i> Đã đặt</span>
-          <span><i class="dot occupied"></i> Đang có khách</span>
+          <span><i class="dot occupied"></i> Có khách</span>
           <span><i class="dot maintenance"></i> Bảo trì</span>
         </div>
 
         <div v-if="reservationStore.isLoading" class="loading">Đang cập nhật sơ đồ...</div>
         
-        <div v-else class="map-grid">
-          <div 
-            v-for="table in reservationStore.tables" 
-            :key="table.id"
-            class="table-card"
-            :class="[table.status.toLowerCase(), { selected: selectedTable?.id === table.id }]"
-            @click="selectTable(table)"
-          >
-            <div class="card-header">
-                <span class="t-name">{{ table.name }}</span>
-                <span class="t-cap">👤 {{ table.capacity }}</span>
-            </div>
-            <div class="card-body">
-                <div class="status-big">{{ getStatusText(table.status) }}</div>
-            </div>
-          </div>
+        <div v-else class="map-wrapper-customer">
+          <TableMap 
+            :tables="reservationStore.tables" 
+            mode="customer"
+            :selected-id="selectedTable?.id"
+            @click-table="selectTable"
+          />
         </div>
       </div>
     </div>
@@ -140,6 +131,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { reservationStore, type Table } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
+import TableMap from '../../components/map/TableMap.vue'; // IMPORT
 
 const router = useRouter();
 const today = new Date().toISOString().split('T')[0];
@@ -259,15 +251,6 @@ const handleBooking = async (formData: any) => {
   }
 };
 
-const getStatusText = (status: string) => {
-    if (status === 'AVAILABLE') return 'Trống';
-    if (status === 'PENDING') return 'Đợi duyệt';
-    if (status === 'RESERVED') return 'Đã đặt';
-    if (status === 'OCCUPIED') return 'Có khách';
-    if (status === 'MAINTENANCE') return 'Bảo trì';
-    return status;
-};
-
 const confirmAndGoToHistory = () => {
   showSuccessModal.value = false;
   setTimeout(() => { router.push('/history'); }, 300);
@@ -318,7 +301,6 @@ onMounted(() => {
 .filter-item label { font-size: 0.8rem; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase; }
 
 /* Inputs styling */
-/* UPDATE: Đảm bảo input và select có độ rộng tương đồng, chiếm hết chiều ngang của filter-item */
 .filter-item input, .filter-item select { 
     padding: 10px 15px; 
     border: 1px solid #ddd; 
@@ -328,8 +310,8 @@ onMounted(() => {
     outline: none; 
     background: #fff; 
     height: 42px; 
-    width: 100%; /* Full width của parent */
-    box-sizing: border-box; /* Đảm bảo padding không làm vỡ layout */
+    width: 100%; 
+    box-sizing: border-box; 
 }
 .filter-item input:focus, .filter-item select:focus { border-color: #a67c52; }
 
@@ -390,49 +372,18 @@ onMounted(() => {
 .btn-primary-action { height: 42px; width: 100%; background: #2c3e50; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
 .btn-primary-action:hover { background: #34495e; transform: translateY(-1px); }
 
-/* Legend & Map */
+/* UPDATE: LEGEND ĐỒNG BỘ */
 .legend { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; font-size: 0.9rem; flex-wrap: wrap; }
-.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
-.dot.available { border: 2px solid #27ae60; background: #fff; }
-.dot.selected { background: #27ae60; }
-.dot.pending { background: #f1c40f; }
-.dot.reserved { background: #e74c3c; opacity: 0.5; }
-.dot.occupied { background: #8e44ad; }
-.dot.maintenance { background: #95a5a6; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; border: 1px solid rgba(0,0,0,0.1); }
 
-.map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; }
-.table-card { background: #fff; border: 2px solid #eee; border-radius: 10px; padding: 15px; cursor: pointer; transition: 0.2s; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
-.table-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.dot.available { background: #20c997; } /* Teal */
+.dot.selected { background: #2ecc71; border: 2px solid #2ecc71; box-shadow: 0 0 0 2px #e8f5e9; } /* Green Selected */
+.dot.pending { background: #7950f2; }   /* Purple */
+.dot.reserved { background: #fab005; }  /* Yellow */
+.dot.occupied { background: #fa5252; }  /* Red */
+.dot.maintenance { background: #868e96; } /* Grey */
 
-/* Status Styles */
-.table-card.available { border-color: #27ae60; }
-.table-card.selected { 
-    border-color: #2ecc71; 
-    background: #e8f5e9; 
-    box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2); 
-    transform: translateY(-3px);
-}
-.table-card.pending { background: #fffcf2; border-color: #f1c40f; opacity: 0.8; cursor: not-allowed; }
-.table-card.reserved { background: #fff5f5; border-color: #e74c3c; opacity: 0.7; cursor: not-allowed; }
-.table-card.occupied { background: #f3e5f5; border-color: #8e44ad; cursor: not-allowed; }
-.table-card.maintenance {
-    background: #f0f2f5;
-    border-color: #bdc3c7;
-    cursor: not-allowed;
-    opacity: 0.9;
-}
-
-.card-header { display: flex; justify-content: space-between; font-weight: 700; color: #555; margin-bottom: 10px; }
-.t-name { font-size: 1rem; }
-.t-cap { font-size: 0.85rem; color: #888; }
-.status-big { text-align: center; font-weight: 600; font-size: 0.9rem; padding: 5px; border-radius: 4px; background: rgba(0,0,0,0.03); }
-
-.table-card.available .status-big { color: #27ae60; }
-.table-card.selected .status-big { color: #27ae60; background: #fff; font-weight: 800; }
-.table-card.pending .status-big { color: #f39c12; }
-.table-card.reserved .status-big { color: #c0392b; }
-.table-card.occupied .status-big { color: #8e44ad; }
-.table-card.maintenance .status-big { color: #7f8c8d; }
+.map-wrapper-customer { margin-top: 10px; }
 
 /* Modals & Animations */
 .footer-action-fixed { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; background: #1a1a1a; color: #fff; padding: 12px 30px; border-radius: 50px; display: flex; align-items: center; gap: 30px; box-shadow: 0 15px 40px rgba(0,0,0,0.3); min-width: 350px; justify-content: space-between; }
