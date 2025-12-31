@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router';
 import { computed, ref, onMounted } from 'vue';
-import { authStore } from '../../store/authStore'; // Import authStore để mock data
+import { authStore } from '../../store/authStore';
+import Swal from 'sweetalert2'; // [Import thêm] Thư viện SweetAlert2
 
 // Import các Modal
 import EditProfileModal from '../EditProfileModal.vue';
@@ -15,9 +16,8 @@ const showDropdown = ref(false);
 const showEditProfile = ref(false);
 const showChangePassword = ref(false);
 
-// Giả lập dữ liệu Admin khi vào trang (Vì chúng ta đang làm Frontend First)
+// Giả lập dữ liệu Admin (Giữ nguyên để test Frontend First)
 onMounted(() => {
-  // Nếu chưa có user trong store (do chưa login thật), ta tạo một user Admin giả
   if (!authStore.user) {
     authStore.user = {
       id: 9999,
@@ -56,9 +56,45 @@ const openPasswordModal = () => {
   showDropdown.value = false;
 };
 
-const handleLogout = () => {
-  authStore.user = null; // Xóa user giả khi logout
-  router.push('/'); 
+// [CHỈNH SỬA] Hàm đăng xuất với SweetAlert2
+const handleLogout = async () => {
+  // 1. Ẩn dropdown ngay lập tức cho gọn
+  showDropdown.value = false;
+
+  // 2. Hiện Popup hỏi xác nhận
+  const result = await Swal.fire({
+    title: 'Đăng xuất?',
+    text: "Bạn sẽ quay lại màn hình đăng nhập.",
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#3085d6', // Màu xanh
+    cancelButtonColor: '#d33',    // Màu đỏ
+    confirmButtonText: 'Đăng xuất',
+    cancelButtonText: 'Ở lại'
+  });
+
+  // 3. Nếu người dùng chọn "Đăng xuất"
+  if (result.isConfirmed) {
+    // Xóa user giả trong store
+    authStore.user = null; 
+
+    // Hiện thông báo nhỏ (Toast) góc trên bên phải
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 1500,
+      timerProgressBar: true
+    });
+    
+    await Toast.fire({
+      icon: 'success',
+      title: 'Đã đăng xuất thành công'
+    });
+
+    // Chuyển hướng về trang Login (hoặc trang chủ)
+    router.push('/'); 
+  }
 };
 </script>
 
@@ -111,7 +147,11 @@ const handleLogout = () => {
       </header>
       
       <div class="page-body">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </RouterView>
       </div>
     </main>
 
@@ -162,6 +202,16 @@ const handleLogout = () => {
 .menu-divider { height: 1px; background: #eee; margin: 5px 0; }
 .menu-item.logout { color: #e74c3c; }
 .menu-item.logout:hover { background: #fff5f5; }
+
+/* Hiệu ứng chuyển trang Fade (Thêm vào cho mượt) */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-10px); }
