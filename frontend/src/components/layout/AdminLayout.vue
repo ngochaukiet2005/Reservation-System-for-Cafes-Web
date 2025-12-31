@@ -2,7 +2,7 @@
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router';
 import { computed, ref, onMounted } from 'vue';
 import { authStore } from '../../store/authStore';
-import Swal from 'sweetalert2'; // [Import thêm] Thư viện SweetAlert2
+import Swal from 'sweetalert2'; 
 
 // Import các Modal
 import EditProfileModal from '../EditProfileModal.vue';
@@ -16,7 +16,10 @@ const showDropdown = ref(false);
 const showEditProfile = ref(false);
 const showChangePassword = ref(false);
 
-// Giả lập dữ liệu Admin (Giữ nguyên để test Frontend First)
+// [FIX ERROR] Đã comment lại phần Mock User tự động này.
+// Lý do: Khi bạn reload trang hoặc logout, đoạn code này lại tự tạo user mới,
+// khiến việc test logout không chính xác. Hãy đăng nhập thật hoặc dùng logic khác.
+/*
 onMounted(() => {
   if (!authStore.user) {
     authStore.user = {
@@ -31,6 +34,7 @@ onMounted(() => {
     };
   }
 });
+*/
 
 // Tên trang hiện tại
 const pageTitle = computed(() => {
@@ -56,29 +60,27 @@ const openPasswordModal = () => {
   showDropdown.value = false;
 };
 
-// [CHỈNH SỬA] Hàm đăng xuất với SweetAlert2
+// [CHỈNH SỬA QUAN TRỌNG] Hàm xử lý Đăng xuất
 const handleLogout = async () => {
-  // 1. Ẩn dropdown ngay lập tức cho gọn
   showDropdown.value = false;
 
-  // 2. Hiện Popup hỏi xác nhận
   const result = await Swal.fire({
     title: 'Đăng xuất?',
     text: "Bạn sẽ quay lại màn hình đăng nhập.",
     icon: 'question',
     showCancelButton: true,
-    confirmButtonColor: '#3085d6', // Màu xanh
-    cancelButtonColor: '#d33',    // Màu đỏ
+    confirmButtonColor: '#3085d6',
+    cancelButtonColor: '#d33',
     confirmButtonText: 'Đăng xuất',
     cancelButtonText: 'Ở lại'
   });
 
-  // 3. Nếu người dùng chọn "Đăng xuất"
   if (result.isConfirmed) {
-    // Xóa user giả trong store
-    authStore.user = null; 
+    // 1. GỌI ACTION LOGOUT CỦA STORE
+    // Hàm này sẽ: Xóa state user, xóa token, xóa localStorage
+    authStore.logout();
 
-    // Hiện thông báo nhỏ (Toast) góc trên bên phải
+    // 2. Hiện thông báo
     const Toast = Swal.mixin({
       toast: true,
       position: 'top-end',
@@ -92,8 +94,11 @@ const handleLogout = async () => {
       title: 'Đã đăng xuất thành công'
     });
 
-    // Chuyển hướng về trang Login (hoặc trang chủ)
-    router.push('/'); 
+    // 3. Chuyển hướng về trang chủ
+    router.push('/');
+    
+    // Mẹo: Nếu vẫn bị dính cache, dùng lệnh dưới thay cho router.push
+    // window.location.href = '/'; 
   }
 };
 </script>
@@ -123,7 +128,7 @@ const handleLogout = async () => {
         
         <div class="user-profile-container" @click="toggleDropdown">
           <div class="user-profile">
-            <span class="username">{{ authStore.user?.name || 'Admin User' }}</span>
+            <span class="username">{{ authStore.user?.name || 'Admin' }}</span>
             
             <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" class="avatar-img" />
             <div v-else class="avatar">A</div>
@@ -168,6 +173,7 @@ const handleLogout = async () => {
 </template>
 
 <style scoped>
+/* Giữ nguyên CSS cũ của bạn */
 .admin-layout { display: flex; min-height: 100vh; background: #f8f9fa; }
 .admin-sidebar { width: 260px; background: #2c3e50; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
 .logo { height: 64px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; border-bottom: 1px solid #34495e; color: #42b983; }
@@ -180,7 +186,6 @@ const handleLogout = async () => {
 .top-header { height: 64px; background: white; border-bottom: 1px solid #e9ecef; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; position: relative; }
 .page-body { padding: 30px; overflow-y: auto; height: 100%; }
 
-/* --- CSS Dropdown & Profile --- */
 .user-profile-container { position: relative; cursor: pointer; }
 .user-profile { display: flex; align-items: center; gap: 10px; font-weight: 500; padding: 5px 10px; border-radius: 8px; transition: background 0.2s; }
 .user-profile:hover { background: #f1f3f5; }
@@ -203,15 +208,10 @@ const handleLogout = async () => {
 .menu-item.logout { color: #e74c3c; }
 .menu-item.logout:hover { background: #fff5f5; }
 
-/* Hiệu ứng chuyển trang Fade (Thêm vào cho mượt) */
 .fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
+.fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+.fade-leave-to { opacity: 0; }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-10px); }
