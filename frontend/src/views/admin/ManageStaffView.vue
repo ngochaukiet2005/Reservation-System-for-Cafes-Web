@@ -1,72 +1,87 @@
 <template>
-  <div class="manage-staff">
-    <div class="header-actions">
-      <h1 class="page-title">Quản lý Nhân viên</h1>
-      <button class="btn-add" @click="openAddStaffModal">
-        + Thêm Nhân viên
+  <div class="manage-staff-container">
+    <div class="page-header">
+      <div class="header-content">
+        <h1 class="page-title">Quản lý Nhân viên</h1>
+        <p class="page-subtitle">Quản lý danh sách và quyền truy cập của nhân viên</p>
+      </div>
+      <button class="btn-primary" @click="openAddStaffModal">
+        <span class="icon">+</span> Thêm Nhân viên
       </button>
     </div>
 
-    <div class="table-container">
-      <table class="staff-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Họ và Tên</th>
-            <th>Tài khoản</th>
-            <th>Liên hệ</th>
-            <th>Ngày tạo</th>
-            <th>Trạng thái</th>
-            <th>Hành động</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="7" class="text-center">Đang tải dữ liệu...</td>
-          </tr>
-          
-          <tr v-else v-for="staff in staffList" :key="staff.id">
-            <td>#{{ staff.id }}</td>
-            <td class="font-bold">{{ staff.fullName }}</td>
-            <td>
-              <div>{{ staff.username }}</div>
-              <small class="text-role">{{ staff.role }}</small>
-            </td>
-            <td>
-              <div>{{ staff.email }}</div>
-              <small>{{ staff.phone }}</small>
-            </td>
-            <td>{{ staff.createdAt }}</td>
-            <td>
-              <span :class="['badge', staff.status.toLowerCase()]">
-                {{ staff.status === 'ACTIVE' ? 'Hoạt động' : 'Đã khóa' }}
-              </span>
-            </td>
-            <td>
-              <button 
-                class="btn-action" 
-                :class="staff.status === 'ACTIVE' ? 'btn-lock' : 'btn-unlock'"
-                @click="toggleStatus(staff)"
-              >
-                {{ staff.status === 'ACTIVE' ? 'Khóa' : 'Mở khóa' }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="table-card">
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th width="5%">ID</th>
+              <th width="25%">Họ và Tên</th>
+              <th width="30%">Email (Tài khoản)</th>
+              <th width="15%">Số điện thoại</th>
+              <th width="10%">Ngày tạo</th>
+              <th width="10%">Trạng thái</th>
+              <th width="5%" class="text-right">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="7" class="loading-cell">
+                <div class="spinner"></div> Đang tải dữ liệu...
+              </td>
+            </tr>
+            
+            <tr v-else v-for="staff in staffList" :key="staff.id">
+              <td class="text-gray">#{{ staff.id }}</td>
+              <td>
+                <div class="user-info">
+                  <div class="avatar-placeholder">
+                    {{ staff.fullName.charAt(0).toUpperCase() }}
+                  </div>
+                  <span class="font-bold text-dark">{{ staff.fullName }}</span>
+                </div>
+              </td>
+              <td>
+                <div class="email-text">{{ staff.email }}</div>
+              </td>
+              <td>{{ staff.phone }}</td>
+              <td class="text-gray">{{ staff.createdAt }}</td>
+              <td>
+                <span :class="['status-badge', staff.status.toLowerCase()]">
+                  {{ staff.status === 'ACTIVE' ? 'Hoạt động' : 'Đã khóa' }}
+                </span>
+              </td>
+              <td class="text-right">
+                <button 
+                  class="btn-icon" 
+                  :class="staff.status === 'ACTIVE' ? 'text-danger' : 'text-success'"
+                  @click="toggleStatus(staff)"
+                  :title="staff.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'"
+                >
+                  <span v-if="staff.status === 'ACTIVE'">🔒</span>
+                  <span v-else>🔓</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div v-if="!loading && staffList.length === 0" class="empty-state">
+        <p>Chưa có nhân viên nào trong hệ thống.</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import Swal from 'sweetalert2'; // Thư viện popup xịn xò có sẵn
+import Swal from 'sweetalert2';
 import { adminApi, type Staff } from '../../api/adminApi';
 
 const staffList = ref<Staff[]>([]);
 const loading = ref(true);
 
-// 1. Tải danh sách
 const fetchStaff = async () => {
   loading.value = true;
   try {
@@ -78,58 +93,107 @@ const fetchStaff = async () => {
   }
 };
 
-// 2. Xử lý Thêm nhân viên (Dùng Swal để làm form nhanh)
 const openAddStaffModal = async () => {
+  // Logic giữ nguyên như cũ
   const { value: formValues } = await Swal.fire({
-    title: 'Thêm Nhân viên mới',
+    title: '<h2 style="font-size: 1.5rem; color: #2c3e50;">Thêm Nhân viên mới</h2>',
     html:
-      '<input id="swal-fullname" class="swal2-input" placeholder="Họ tên">' +
-      '<input id="swal-username" class="swal2-input" placeholder="Tên đăng nhập">' +
-      '<input id="swal-email" class="swal2-input" placeholder="Email">',
+      '<div class="swal-form-group">' +
+        '<label>Họ và tên</label>' +
+        '<input id="swal-fullname" class="swal2-input custom-swal-input" placeholder="Ví dụ: Nguyễn Văn A">' +
+      '</div>' +
+      
+      '<div class="swal-form-group">' +
+        '<label>Số điện thoại</label>' +
+        '<input id="swal-phone" class="swal2-input custom-swal-input" placeholder="090xxxxxxx">' +
+      '</div>' +
+      
+      '<div class="swal-form-group">' +
+        '<label>Email (Đăng nhập)</label>' +
+        '<input id="swal-email" type="email" class="swal2-input custom-swal-input" placeholder="nhanvien@cafe.com">' +
+      '</div>' +
+      
+      '<div class="swal-form-group">' +
+        '<label>Mật khẩu</label>' +
+        '<input id="swal-password" type="password" class="swal2-input custom-swal-input" placeholder="******">' +
+      '</div>' +
+      
+      '<div class="swal-form-group">' +
+        '<label>Xác nhận mật khẩu</label>' +
+        '<input id="swal-confirm-password" type="password" class="swal2-input custom-swal-input" placeholder="******">' +
+      '</div>',
     focusConfirm: false,
     showCancelButton: true,
-    confirmButtonText: 'Tạo',
-    cancelButtonText: 'Hủy',
+    confirmButtonText: 'Tạo tài khoản',
+    cancelButtonText: 'Hủy bỏ',
+    confirmButtonColor: '#3498db',
+    cancelButtonColor: '#95a5a6',
+    customClass: {
+      popup: 'custom-swal-popup'
+    },
     preConfirm: () => {
-      return {
-        fullName: (document.getElementById('swal-fullname') as HTMLInputElement).value,
-        username: (document.getElementById('swal-username') as HTMLInputElement).value,
-        email: (document.getElementById('swal-email') as HTMLInputElement).value,
+      const fullName = (document.getElementById('swal-fullname') as HTMLInputElement).value;
+      const phone = (document.getElementById('swal-phone') as HTMLInputElement).value;
+      const email = (document.getElementById('swal-email') as HTMLInputElement).value;
+      const password = (document.getElementById('swal-password') as HTMLInputElement).value;
+      const confirmPassword = (document.getElementById('swal-confirm-password') as HTMLInputElement).value;
+
+      if (!fullName || !phone || !email || !password || !confirmPassword) {
+        Swal.showValidationMessage('Vui lòng điền đầy đủ thông tin');
+        return false;
       }
+      if (!email.includes('@')) {
+        Swal.showValidationMessage('Email không hợp lệ');
+        return false;
+      }
+      if (password.length < 6) {
+        Swal.showValidationMessage('Mật khẩu phải từ 6 ký tự trở lên');
+        return false;
+      }
+      if (password !== confirmPassword) {
+        Swal.showValidationMessage('Mật khẩu xác nhận không khớp');
+        return false;
+      }
+
+      return { fullName, email, phone, password };
     }
   });
 
   if (formValues) {
-    // Gọi API giả lập
-    const newStaff = await adminApi.createStaff(formValues);
-    staffList.value.push(newStaff); // Cập nhật UI ngay lập tức (Real-time feel)
-    Swal.fire('Thành công', `Đã thêm nhân viên ${newStaff.fullName}`, 'success');
+    try {
+      const newStaff = await adminApi.createStaff(formValues);
+      staffList.value.push(newStaff); 
+      Swal.fire({
+        icon: 'success',
+        title: 'Thành công',
+        text: `Đã tạo tài khoản cho: ${newStaff.email}`,
+        confirmButtonColor: '#3498db'
+      });
+    } catch (error) {
+      Swal.fire('Lỗi', 'Không thể tạo nhân viên', 'error');
+    }
   }
 };
 
-// 3. Xử lý Khóa/Mở khóa
 const toggleStatus = async (staff: Staff) => {
   const actionName = staff.status === 'ACTIVE' ? 'khóa' : 'mở khóa';
-  
   const result = await Swal.fire({
-    title: `Xác nhận ${actionName}?`,
-    text: `Bạn có chắc muốn ${actionName} tài khoản ${staff.username}?`,
+    title: 'Xác nhận thay đổi?',
+    text: `Bạn có chắc muốn ${actionName} tài khoản ${staff.email}?`,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonColor: staff.status === 'ACTIVE' ? '#d33' : '#3085d6',
-    confirmButtonText: 'Đồng ý'
+    confirmButtonColor: staff.status === 'ACTIVE' ? '#e74c3c' : '#27ae60',
+    cancelButtonColor: '#95a5a6',
+    confirmButtonText: 'Đồng ý',
+    cancelButtonText: 'Hủy'
   });
 
   if (result.isConfirmed) {
-    // Gọi API giả lập
     const newStatus = await adminApi.toggleStaffStatus(staff.id, staff.status);
-    
-    // Cập nhật UI ngay lập tức
     const index = staffList.value.findIndex(s => s.id === staff.id);
     if (index !== -1) {
       staffList.value[index].status = newStatus as 'ACTIVE' | 'LOCKED';
     }
-    
     Swal.fire('Đã cập nhật!', `Tài khoản đã được ${actionName}.`, 'success');
   }
 };
@@ -140,81 +204,217 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.manage-staff { padding: 20px; }
-.header-actions {
+/* 1. Layout Container */
+.manage-staff-container {
+  padding: 32px;
+  background-color: #f8f9fa; /* Màu nền nhẹ cho toàn trang */
+  min-height: 100vh;
+}
+
+/* 2. Header Styles */
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
-.page-title { margin: 0; font-size: 1.8rem; color: #2c3e50; }
 
-/* Buttons */
-.btn-add {
-  background: #3498db;
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+}
+
+.page-subtitle {
+  color: #718096;
+  margin-top: 4px;
+  font-size: 0.95rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
+  padding: 12px 24px;
+  border-radius: 8px;
   font-weight: 600;
-  transition: background 0.2s;
-}
-.btn-add:hover { background: #2980b9; }
-
-.btn-action {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
   cursor: pointer;
-  font-size: 0.85rem;
-  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 6px rgba(52, 152, 219, 0.2);
+  transition: all 0.3s ease;
 }
-.btn-lock { background: #e74c3c; }
-.btn-lock:hover { background: #c0392b; }
-.btn-unlock { background: #27ae60; }
-.btn-unlock:hover { background: #219150; }
 
-/* Table Styling */
-.table-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-  overflow: hidden;
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(52, 152, 219, 0.3);
 }
-.staff-table {
+
+/* 3. Table Card Styles */
+.table-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+  overflow: hidden; /* Để bo góc */
+  border: 1px solid #edf2f7;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.custom-table {
   width: 100%;
   border-collapse: collapse;
-}
-.staff-table th, .staff-table td {
-  padding: 15px;
   text-align: left;
-  border-bottom: 1px solid #ecf0f1;
-}
-.staff-table th {
-  background-color: #f8f9fa;
-  font-weight: 600;
-  color: #2c3e50;
-}
-.font-bold { font-weight: 600; }
-.text-role { 
-  display: block; 
-  font-size: 0.75rem; 
-  color: #7f8c8d; 
-  background: #eee; 
-  width: fit-content; 
-  padding: 2px 6px; 
-  border-radius: 4px; 
 }
 
-/* Badge Status */
-.badge {
-  padding: 5px 10px;
-  border-radius: 20px;
-  font-size: 0.8rem;
+.custom-table th {
+  background-color: #f7fafc;
+  color: #4a5568;
   font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 16px 24px;
+  border-bottom: 2px solid #edf2f7;
 }
-.badge.active { background-color: #eafaf1; color: #27ae60; }
-.badge.locked { background-color: #fdedec; color: #c0392b; }
-.text-center { text-align: center; color: #95a5a6; padding: 30px; }
+
+.custom-table td {
+  padding: 16px 24px;
+  border-bottom: 1px solid #edf2f7;
+  color: #2d3748;
+  vertical-align: middle;
+  font-size: 0.95rem;
+}
+
+.custom-table tr:last-child td {
+  border-bottom: none;
+}
+
+.custom-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.custom-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* 4. Cell Components */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  background-color: #ebf8ff;
+  color: #3182ce;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.email-text {
+  color: #3182ce;
+  font-weight: 500;
+}
+
+.text-gray {
+  color: #a0aec0;
+  font-size: 0.85rem;
+}
+
+.text-right {
+  text-align: right;
+}
+
+/* 5. Status Badges - Soft Style */
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.status-badge.active {
+  background-color: #def7ec;
+  color: #03543f;
+}
+
+.status-badge.locked {
+  background-color: #fde8e8;
+  color: #9b1c1c;
+}
+
+/* 6. Action Buttons */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+  font-size: 1.1rem;
+}
+
+.btn-icon:hover {
+  background-color: #edf2f7;
+}
+
+.loading-cell {
+  padding: 40px;
+  text-align: center;
+  color: #718096;
+}
+
+.empty-state {
+  padding: 40px;
+  text-align: center;
+  color: #a0aec0;
+}
+</style>
+
+<style>
+.custom-swal-popup {
+  border-radius: 16px !important;
+  padding: 24px !important;
+}
+
+.swal-form-group {
+  text-align: left;
+  margin-bottom: 16px;
+}
+
+.swal-form-group label {
+  display: block;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+}
+
+.custom-swal-input {
+  margin: 0 !important;
+  width: 100% !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  padding: 10px 12px !important;
+  box-sizing: border-box !important;
+  font-size: 0.95rem !important;
+}
+
+.custom-swal-input:focus {
+  border-color: #3182ce !important;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1) !important;
+}
 </style>
