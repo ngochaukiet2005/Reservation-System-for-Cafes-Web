@@ -8,7 +8,6 @@ interface User {
   name: string;
   email: string;
   phone?: string;
-  address?: string;
   gender?: 'Nam' | 'Nữ';
   role: 'ADMIN' | 'STAFF' | 'CUSTOMER';
   avatar?: string;
@@ -40,7 +39,6 @@ export const authStore = reactive({
         user.name,
         user.email,
         user.phone || '',
-        '',
         'Nam',
         user.role,
         avatar
@@ -58,7 +56,7 @@ export const authStore = reactive({
   },
 
   // --- LOGIC ĐĂNG KÝ ---
-  async register(payload: { name: string; email: string; phone: string; address: string; gender: 'Nam' | 'Nữ'; password: string }) {
+  async register(payload: { name: string; email: string; phone: string; gender: 'Nam' | 'Nữ'; password: string }) {
     this.isLoading = true;
     try {
       const response = await authApi.register({
@@ -75,7 +73,6 @@ export const authStore = reactive({
         user.name,
         user.email,
         user.phone,
-        payload.address,
         payload.gender,
         user.role,
         avatar
@@ -93,40 +90,46 @@ export const authStore = reactive({
   },
 
   // --- CẬP NHẬT THÔNG TIN ---
-  async updateProfile(payload: { name: string; phone: string; address: string; gender: 'Nam' | 'Nữ'; avatarFile?: File | null }) {
+  async updateProfile(payload: { name: string; phone: string; gender: 'Nam' | 'Nữ'; avatarFile?: File | null }) {
     this.isLoading = true;
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        this.isLoading = false;
-        if (this.user) {
-          const oldAvatar = this.user.avatar;
-          
-          this.user.name = payload.name;
-          this.user.phone = payload.phone;
-          this.user.address = payload.address;
-          this.user.gender = payload.gender;
+    try {
+      // Gọi API thật
+      const response = await authApi.updateProfile({
+        user_name: payload.name,
+        phone_number: payload.phone,
+      });
 
-          if (payload.avatarFile) {
-            this.user.avatar = URL.createObjectURL(payload.avatarFile);
-          } else {
-            const isUsingDefaultMale = oldAvatar === AVATAR_MALE;
-            const isUsingDefaultFemale = oldAvatar === AVATAR_FEMALE;
+      if (this.user && response.data) {
+        const oldAvatar = this.user.avatar;
+        
+        this.user.name = payload.name;
+        this.user.phone = payload.phone;
+        this.user.gender = payload.gender;
 
-            if (payload.gender === 'Nam' && isUsingDefaultFemale) {
-                 this.user.avatar = AVATAR_MALE;
-            } 
-            else if (payload.gender === 'Nữ' && isUsingDefaultMale) {
-                 this.user.avatar = AVATAR_FEMALE;
-            }
+        if (payload.avatarFile) {
+          this.user.avatar = URL.createObjectURL(payload.avatarFile);
+        } else {
+          const isUsingDefaultMale = oldAvatar === AVATAR_MALE;
+          const isUsingDefaultFemale = oldAvatar === AVATAR_FEMALE;
+
+          if (payload.gender === 'Nam' && isUsingDefaultFemale) {
+               this.user.avatar = AVATAR_MALE;
+          } 
+          else if (payload.gender === 'Nữ' && isUsingDefaultMale) {
+               this.user.avatar = AVATAR_FEMALE;
           }
-          
-          // Cập nhật lại localStorage
-          localStorage.setItem('auth_user', JSON.stringify(this.user));
-
-          resolve(true);
         }
-      }, 1000);
-    });
+        
+        // Cập nhật lại localStorage
+        localStorage.setItem('auth_user', JSON.stringify(this.user));
+      }
+      
+      this.isLoading = false;
+      return true;
+    } catch (error: any) {
+      this.isLoading = false;
+      throw error.response?.data?.message || 'Cập nhật thất bại!';
+    }
   },
 
   // --- ĐĂNG XUẤT (Clear cả Storage) ---
@@ -142,8 +145,8 @@ export const authStore = reactive({
   },
 
   // --- SET USER ---
-  setUser(id: number, name: string, email: string, phone: string, address: string, gender: 'Nam'|'Nữ', role: any, avatar: string) {
-    this.user = { id, name, email, phone, address, gender, role, avatar };
+  setUser(id: number, name: string, email: string, phone: string, gender: 'Nam'|'Nữ', role: any, avatar: string) {
+    this.user = { id, name, email, phone, gender, role, avatar };
     this.isAuthenticated = true;
     localStorage.setItem('auth_user', JSON.stringify(this.user));
   },

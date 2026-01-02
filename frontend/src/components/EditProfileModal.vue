@@ -42,11 +42,7 @@
           <div class="form-row">
             <div class="input-group">
               <label>Số điện thoại</label>
-              <input v-model="form.phone" type="tel" required>
-            </div>
-            <div class="input-group">
-              <label>Địa chỉ</label>
-              <input v-model="form.address" type="text" required>
+              <input v-model="form.phone" type="tel">
             </div>
           </div>
 
@@ -84,15 +80,13 @@ const successMsg = ref('');
 const form = reactive({
   name: '',
   phone: '',
-  address: '',
   gender: 'Nam' // Mặc định
 });
 
 watch(() => props.isVisible, (newVal) => {
   if (newVal && authStore.user) {
     form.name = authStore.user.name;
-    form.phone = authStore.user.phone;
-    form.address = authStore.user.address;
+    form.phone = authStore.user.phone || '';
     form.gender = authStore.user.gender || 'Nam';
     previewAvatar.value = null;
     selectedFile.value = null;
@@ -113,15 +107,19 @@ const handleFileChange = (event: Event) => {
 };
 
 const handleSubmit = async () => {
-  await authStore.updateProfile({
-    name: form.name,
-    phone: form.phone,
-    address: form.address,
-    gender: form.gender as 'Nam' | 'Nữ',
-    avatarFile: selectedFile.value
-  });
-  successMsg.value = 'Cập nhật thông tin thành công!';
-  setTimeout(() => close(), 1500);
+  try {
+    await authStore.updateProfile({
+      name: form.name,
+      phone: form.phone,
+      gender: form.gender as 'Nam' | 'Nữ',
+      avatarFile: selectedFile.value
+    });
+    successMsg.value = 'Cập nhật thông tin thành công!';
+    setTimeout(() => close(), 1500);
+  } catch (error: any) {
+    successMsg.value = '';
+    alert(error || 'Cập nhật thất bại!');
+  }
 };
 </script>
 

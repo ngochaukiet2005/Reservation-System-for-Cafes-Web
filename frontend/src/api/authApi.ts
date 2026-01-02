@@ -1,7 +1,7 @@
 import { httpClient } from './httpClient';
 
 // --- CẤU HÌNH: Đặt true để test giao diện, đặt false khi kết nối Backend ---
-const IS_MOCK_MODE = true; 
+const IS_MOCK_MODE = false; 
 
 export const authApi = {
   // 1. Đăng nhập (Chế độ Mock thông minh)
@@ -16,7 +16,7 @@ export const authApi = {
       
       if (payload.email.includes('admin')) {
         role = 'ADMIN';
-        name = 'Quản Trị Viên';
+        name = 'Admin User';
       } else if (payload.email.includes('staff')) {
         role = 'STAFF';
         name = 'Nhân Viên Test';
@@ -90,5 +90,10 @@ export const authApi = {
     console.log(`[Mock API] Đổi mật khẩu thành công cho ${email}`);
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return { success: true, message: 'Đổi mật khẩu thành công!' };
+  },
+
+  // 6. Cập nhật thông tin profile
+  async updateProfile(payload: { user_name: string; phone_number: string }) {
+    return httpClient.put('/users/profile', payload);
   },
 };
