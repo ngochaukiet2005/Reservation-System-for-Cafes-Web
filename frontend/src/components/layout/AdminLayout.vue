@@ -16,26 +16,6 @@ const showDropdown = ref(false);
 const showEditProfile = ref(false);
 const showChangePassword = ref(false);
 
-// [FIX ERROR] Đã comment lại phần Mock User tự động này.
-// Lý do: Khi bạn reload trang hoặc logout, đoạn code này lại tự tạo user mới,
-// khiến việc test logout không chính xác. Hãy đăng nhập thật hoặc dùng logic khác.
-/*
-onMounted(() => {
-  if (!authStore.user) {
-    authStore.user = {
-      id: 9999,
-      name: 'Admin Quản Trị',
-      email: 'admin@cafe.com',
-      phone: '0912345678',
-      address: 'Trụ sở chính Coffee House',
-      gender: 'Nam',
-      avatar: '', 
-      role: 'ADMIN'
-    };
-  }
-});
-*/
-
 // Tên trang hiện tại
 const pageTitle = computed(() => {
   switch (route.path) {
@@ -60,7 +40,7 @@ const openPasswordModal = () => {
   showDropdown.value = false;
 };
 
-// [CHỈNH SỬA QUAN TRỌNG] Hàm xử lý Đăng xuất
+// Hàm xử lý Đăng xuất
 const handleLogout = async () => {
   showDropdown.value = false;
 
@@ -76,11 +56,7 @@ const handleLogout = async () => {
   });
 
   if (result.isConfirmed) {
-    // 1. GỌI ACTION LOGOUT CỦA STORE
-    // Hàm này sẽ: Xóa state user, xóa token, xóa localStorage
     authStore.logout();
-
-    // 2. Hiện thông báo
     const Toast = Swal.mixin({
       toast: true,
       position: 'top-end',
@@ -94,11 +70,7 @@ const handleLogout = async () => {
       title: 'Đã đăng xuất thành công'
     });
 
-    // 3. Chuyển hướng về trang chủ
     router.push('/');
-    
-    // Mẹo: Nếu vẫn bị dính cache, dùng lệnh dưới thay cho router.push
-    // window.location.href = '/'; 
   }
 };
 </script>
@@ -173,48 +145,65 @@ const handleLogout = async () => {
 </template>
 
 <style scoped>
-/* Giữ nguyên CSS cũ của bạn */
-.admin-layout { display: flex; min-height: 100vh; background: #f8f9fa; }
-.admin-sidebar { width: 260px; background: #2c3e50; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
-.logo { height: 64px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; border-bottom: 1px solid #34495e; color: #42b983; }
+/* 1. LAYOUT CHÍNH: Cố định chiều cao bằng màn hình */
+.admin-layout { 
+  display: flex; 
+  height: 100vh;      /* Thay đổi quan trọng: dùng height thay vì min-height */
+  overflow: hidden;   /* Ẩn thanh cuộn của trình duyệt (tránh cuộn cả trang) */
+  background: #f8f9fa; 
+}
+
+/* 2. SIDEBAR: Cố định bên trái, tự cuộn nếu menu dài */
+.admin-sidebar { 
+  width: 260px; 
+  background: #2c3e50; 
+  color: white; 
+  display: flex; 
+  flex-direction: column; 
+  flex-shrink: 0; 
+  overflow-y: auto; /* Cho phép cuộn nội bộ nếu menu quá dài */
+}
+
+.logo { height: 64px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; border-bottom: 1px solid #34495e; color: #42b983; flex-shrink: 0; }
 .nav-menu { padding: 20px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .nav-item { padding: 12px 16px; color: #ecf0f1; text-decoration: none; border-radius: 8px; transition: all 0.2s; display: flex; align-items: center; gap: 10px; }
 .nav-item:hover { background: rgba(255,255,255,0.1); }
 .nav-item.router-link-active { background: #42b983; color: white; font-weight: 500; }
 
-.main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.top-header { height: 64px; background: white; border-bottom: 1px solid #e9ecef; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; position: relative; }
-.page-body { padding: 30px; overflow-y: auto; height: 100%; }
+/* 3. MAIN CONTENT: Chứa Header và Body */
+.main-content { 
+  flex: 1; 
+  display: flex; 
+  flex-direction: column; 
+  height: 100%; /* Chiếm toàn bộ chiều cao màn hình */
+  overflow: hidden; 
+}
 
+.top-header { height: 64px; background: white; border-bottom: 1px solid #e9ecef; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; position: relative; flex-shrink: 0; }
+
+/* 4. PAGE BODY: Chỉ cuộn khu vực này */
+.page-body { 
+  padding: 30px; 
+  flex: 1;          /* Tự động chiếm phần còn lại */
+  overflow-y: auto; /* QUAN TRỌNG: Chỉ nội dung này mới cuộn */
+  scroll-behavior: smooth;
+}
+
+/* CSS cho Dropdown & Profile (Giữ nguyên) */
 .user-profile-container { position: relative; cursor: pointer; }
 .user-profile { display: flex; align-items: center; gap: 10px; font-weight: 500; padding: 5px 10px; border-radius: 8px; transition: background 0.2s; }
 .user-profile:hover { background: #f1f3f5; }
-
 .username { color: #2c3e50; }
 .avatar { width: 36px; height: 36px; background: #42b983; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
 .avatar-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid #ddd; }
 .arrow { font-size: 0.7rem; color: #95a5a6; }
-
-.dropdown-menu {
-  position: absolute; top: 120%; right: 0; width: 220px;
-  background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  padding: 8px 0; border: 1px solid #eee; z-index: 1000; animation: fadeIn 0.2s ease;
-}
-
+.dropdown-menu { position: absolute; top: 120%; right: 0; width: 220px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 8px 0; border: 1px solid #eee; z-index: 1000; animation: fadeIn 0.2s ease; }
 .menu-item { padding: 10px 15px; font-size: 0.95rem; color: #34495e; transition: background 0.2s; cursor: pointer; display: flex; align-items: center; gap: 10px; }
 .menu-item:hover { background: #f8f9fa; color: #42b983; }
-
 .menu-divider { height: 1px; background: #eee; margin: 5px 0; }
 .menu-item.logout { color: #e74c3c; }
 .menu-item.logout:hover { background: #fff5f5; }
-
-.fade-enter-active,
-.fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from,
-.fade-leave-to { opacity: 0; }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
