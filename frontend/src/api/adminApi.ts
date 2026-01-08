@@ -1,6 +1,7 @@
 // src/api/adminApi.ts
+import { httpClient } from './httpClient';
 
-// Interface cho Thống kê Dashboard
+// Interface cho Thống kê Dashboard (placeholder)
 export interface DashboardStats {
   totalRevenue: number;
   totalOrders: number;
@@ -8,19 +9,19 @@ export interface DashboardStats {
   totalStaff: number;
 }
 
-// Interface cho Staff
+// Interface hiển thị Staff trên UI
 export interface Staff {
   id: number;
   fullName: string;
-  email: string;      // Định danh chính
-  username: string;   // Sẽ ẩn đi hoặc để giống email
+  email: string;
+  username: string;
   phone: string;
   status: 'ACTIVE' | 'LOCKED';
   role: 'STAFF';
   createdAt: string;
 }
 
-// DTO khi tạo mới: Chỉ cần Email, không cần Username
+// DTO từ form tạo mới
 export interface CreateStaffDTO {
   fullName: string;
   email: string;
@@ -28,7 +29,7 @@ export interface CreateStaffDTO {
   password?: string;
 }
 
-// MOCK DATA
+// Tạm thời giữ mock cho dashboard
 const mockStats: DashboardStats = {
   totalRevenue: 15500000,
   totalOrders: 124,
@@ -36,49 +37,60 @@ const mockStats: DashboardStats = {
   totalStaff: 5,
 };
 
-const mockStaffs: Staff[] = [
-  { id: 1, fullName: 'Nguyễn Văn A', email: 'staff1@cafe.com', username: 'staff1@cafe.com', phone: '0901234567', status: 'ACTIVE', role: 'STAFF', createdAt: '2023-10-01' },
-  { id: 2, fullName: 'Trần Thị B', email: 'staff2@cafe.com', username: 'staff2@cafe.com', phone: '0909876543', status: 'ACTIVE', role: 'STAFF', createdAt: '2023-10-05' },
-  { id: 3, fullName: 'Lê Văn C', email: 'staff3@cafe.com', username: 'staff3@cafe.com', phone: '0912345678', status: 'LOCKED', role: 'STAFF', createdAt: '2023-11-20' },
-];
+function mapUserToStaff(user: any): Staff {
+  return {
+    id: Number(user.id),
+    fullName: user.user_name,
+    email: user.email,
+    username: user.email,
+    phone: user.phone_number || '',
+    status: user.is_locked ? 'LOCKED' : 'ACTIVE',
+    role: 'STAFF',
+    createdAt: (user.created_at || '').toString().substring(0, 10),
+  };
+}
 
 export const adminApi = {
-  getDashboardStats(): Promise<DashboardStats> {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockStats), 500);
-    });
+  // Vẫn mock phần thống kê
+  async getDashboardStats(): Promise<DashboardStats> {
+    return new Promise((resolve) => setTimeout(() => resolve(mockStats), 300));
   },
 
-  getAllStaff(): Promise<Staff[]> {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockStaffs), 500);
-    });
+  // Lấy danh sách staff từ Backend
+  async getAllStaff(): Promise<Staff[]> {
+    const res = await httpClient.get('/users/staff');
+    const list = res.data?.data || [];
+    return list.map(mapUserToStaff);
   },
 
-  // [LOGIC MỚI] Tạo nhân viên
-  createStaff(data: CreateStaffDTO): Promise<Staff> {
-    return new Promise((resolve) => {
-      const newStaff: Staff = {
-        id: Math.floor(Math.random() * 1000),
-        fullName: data.fullName,
+  // Tạo nhân viên qua Backend
+  async createStaff(data: CreateStaffDTO): Promise<Staff> {
+    try {
+      const payload = {
         email: data.email,
-        username: data.email, // Gán username bằng email luôn để đồng bộ
-        phone: data.phone,
-        status: 'ACTIVE',
-        role: 'STAFF',
-        createdAt: new Date().toISOString().split('T')[0]
+        password: data.password || 'staff123',
+        user_name: data.fullName,
+        phone_number: data.phone || undefined,
       };
-
-      // Sau này Backend sẽ nhận: email, password, fullName, phone
-      // console.log("Account created with Email/Pass:", data.email, data.password);
-
-      setTimeout(() => resolve(newStaff), 600);
-    });
+      const res = await httpClient.post('/users/staff', payload);
+      const user = res.data?.data;
+      return mapUserToStaff(user);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Không thể tạo nhân viên';
+      throw new Error(Array.isArray(msg) ? msg.join('\n') : msg);
+    }
   },
 
-  toggleStaffStatus(id: number, currentStatus: string): Promise<string> {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE'), 400);
-    });
-  }
+  // Đổi trạng thái: dùng updateStaff để toggle khóa/mở khóa
+  async toggleStaffStatus(id: number, currentStatus: string): Promise<string> {
+    try {
+      const payload = { is_locked: currentStatus === 'ACTIVE' };
+      const res = await httpClient.put(`/users/staff/${id}`, payload);
+      const user = res.data?.data;
+      return user?.is_locked ? 'LOCKED' : 'ACTIVE';
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Không thể cập nhật trạng thái';
+      throw new Error(Array.isArray(msg) ? msg.join('\n') : msg);
+    }
+  },
 };
