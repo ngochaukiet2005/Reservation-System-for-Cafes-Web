@@ -9,9 +9,6 @@ export class CafeTable {
   @Column({ type: 'int' })
   capacity!: number;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  area?: string;
-
   @ManyToOne(() => TableStatus, { nullable: false })
   @JoinColumn({ name: 'status_id' })
   status!: TableStatus;
