@@ -1,4 +1,7 @@
+import { IsInt, Min } from 'class-validator';
+
 export class CreateTableDto {
-  name!: string;
+  @IsInt()
+  @Min(1)
   capacity!: number;
 }
