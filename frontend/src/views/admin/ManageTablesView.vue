@@ -7,135 +7,116 @@
         <p class="subtitle">Quản lý thiết lập và trạng thái vận hành bàn</p>
       </div>
       
-      <button v-if="!isPastMode" class="btn-add" @click="openAddModal">
+      <button class="btn-add" @click="openAddModal">
         <span class="plus-icon">+</span> Thêm bàn mới
       </button>
     </div>
 
-    <div v-if="isPastMode" class="history-banner">
-      ⚠️ Bạn đang xem trạng thái quá khứ. Các chức năng chỉnh sửa đã bị khóa.
-    </div>
+    <div v-if="loading" class="loading-text">Đang tải dữ liệu...</div>
 
-    <div class="toolbar-container">
-      <div class="tool-group time-group">
-        <label>🕒 Thời điểm xem:</label>
-        <input 
-          type="datetime-local" 
-          v-model="selectedTime" 
-          class="time-input"
-          :class="{ 'is-past': isPastMode }"
+    <div v-else class="map-area">
+      <div class="tables-grid">
+        <div 
+          v-for="table in tables" 
+          :key="table.id"
+          class="table-card"
+          :class="`status-${table.status.name.toLowerCase()}`"
+          @click="handleAdminAction(table)"
         >
-        <button v-if="isPastMode" class="btn-reset" @click="resetToNow">
-          Về hiện tại
-        </button>
+          <div class="table-number">Bàn #{{ table.id }}</div>
+          <div class="table-capacity">{{ table.capacity }} ghế</div>
+          <div class="table-status">{{ getStatusLabel(table.status.name) }}</div>
+        </div>
       </div>
-
-      <div class="tool-group filter-group">
-        <label>🌪 Lọc trạng thái:</label>
-        <select v-model="filterStatus" class="filter-select">
-          <option value="ALL">Tất cả</option>
-          <option value="AVAILABLE">Trống</option>
-          <option value="PENDING">Chờ duyệt</option>
-          <option value="RESERVED">Đã đặt</option>
-          <option value="OCCUPIED">Có khách</option>
-          <option value="DISABLED">Bảo trì</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="status-legend">
-      <div class="legend-item available"><span class="dot"></span> Trống</div>
-      <div class="legend-item pending"><span class="dot"></span> Chờ duyệt</div>
-      <div class="legend-item reserved"><span class="dot"></span> Đã đặt</div>
-      <div class="legend-item occupied"><span class="dot"></span> Có khách</div>
-      <div class="legend-item disabled"><span class="dot"></span> Bảo trì</div>
-    </div>
-
-    <div class="map-area">
-      <TableMap 
-        :tables="filteredTables" 
-        mode="admin" 
-        :readOnly="isPastMode"
-        @click-table="handleAdminAction" 
-      />
     </div>
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useTableStore } from '../../store/tableStore';
-import TableMap from '../../components/map/TableMap.vue';
+import { ref, onMounted } from 'vue';
+import { tableApi, type Table } from '../../api/tableApi';
 import Swal from 'sweetalert2';
 
-const store = useTableStore();
-onMounted(() => store.initRealTimeListener());
+const tables = ref<Table[]>([]);
+const loading = ref(true);
+const statuses = ref<Array<{ id: number; name: string }>>([]);
 
-// --- LOGIC THỜI GIAN ---
-const getNowString = () => {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  return now.toISOString().slice(0, 16);
+const loadTables = async () => {
+  try {
+    loading.value = true;
+    const data = await tableApi.getAll();
+    tables.value = data;
+  } catch (error: any) {
+    console.error('Lỗi tải danh sách bàn:', error);
+    Swal.fire({
+      icon: 'error',
+      title: 'Lỗi',
+      text: error.response?.data?.message || 'Không thể tải danh sách bàn',
+    });
+  } finally {
+    loading.value = false;
+  }
 };
-const selectedTime = ref(getNowString());
-const resetToNow = () => selectedTime.value = getNowString();
 
-const isPastMode = computed(() => {
-  const selected = new Date(selectedTime.value).getTime();
-  const now = new Date().getTime();
-  return selected < (now - 5 * 60 * 1000); 
-});
+const loadStatuses = async () => {
+  try {
+    const data = await tableApi.getStatuses();
+    statuses.value = data;
+  } catch (error) {
+    console.error('Lỗi tải trạng thái:', error);
+  }
+};
 
-// --- LOGIC BỘ LỌC ---
-const filterStatus = ref('ALL');
-const filteredTables = computed(() => {
-  return store.tables.filter(table => {
-    return filterStatus.value === 'ALL' || table.status === filterStatus.value;
-  });
-});
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    'AVAILABLE': '🟢 Trống',
+    'PENDING': '🟡 Chờ duyệt',
+    'RESERVED': '🟠 Đã đặt',
+    'OCCUPIED': '🔴 Có khách',
+    'DISABLED': '⚫ Bảo trì',
+  };
+  return labels[status] || status;
+};
 
-// --- ACTIONS ---
+// --- THÊM BÀN MỚI ---
 const openAddModal = async () => {
   const { value: form } = await Swal.fire({
     title: 'Thêm bàn mới',
     html: `
-      <input id="swal-label" class="swal2-input" placeholder="Tên bàn">
       <input id="swal-seats" type="number" min="1" class="swal2-input" placeholder="Số ghế">
     `,
     showCancelButton: true,
     confirmButtonText: 'Tạo bàn',
     preConfirm: () => {
-      const label = (document.getElementById('swal-label') as HTMLInputElement).value;
       const seats = parseInt((document.getElementById('swal-seats') as HTMLInputElement).value);
-      if (!label || isNaN(seats) || seats < 1) {
-        return Swal.showValidationMessage('Vui lòng nhập tên và số ghế lớn hơn 0');
+      if (isNaN(seats) || seats < 1) {
+        return Swal.showValidationMessage('Vui lòng nhập số ghế lớn hơn 0');
       }
-      return { label, seats };
+      return { seats };
     }
   });
 
   if (form) {
-    store.addTable(form);
-    Swal.fire({ icon: 'success', title: 'Đã thêm bàn!', timer: 1000, showConfirmButton: false });
+    try {
+      await tableApi.create({ capacity: form.seats });
+      Swal.fire({ icon: 'success', title: 'Đã thêm bàn!', timer: 1500, showConfirmButton: false });
+      await loadTables();
+    } catch (error: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: error.response?.data?.message || 'Không thể tạo bàn',
+      });
+    }
   }
 };
 
-const handleAdminAction = async (table: any) => {
-  const editableStatus = ['AVAILABLE', 'DISABLED'];
-  
-  if (!editableStatus.includes(table.status)) {
-    return Swal.fire({
-      icon: 'warning',
-      title: 'Không thể can thiệp',
-      text: `Bàn đang ở trạng thái "${table.status}". Chỉ bàn Trống hoặc Bảo trì mới có thể thay đổi thiết lập.`,
-      confirmButtonText: 'Đã hiểu'
-    });
-  }
-
+// --- XỬ LÝ CLICK BÀN ---
+const handleAdminAction = async (table: Table) => {
   const { value: action } = await Swal.fire({
-    title: `Quản lý ${table.label}`,
-    text: `Trạng thái hiện tại: ${table.status}`,
+    title: `Quản lý Bàn #${table.id}`,
+    text: `Trạng thái: ${getStatusLabel(table.status.name)} - ${table.capacity} ghế`,
     showDenyButton: true,
     showCancelButton: true,
     confirmButtonText: '📝 Sửa thông tin',
@@ -151,55 +132,110 @@ const handleAdminAction = async (table: any) => {
   });
 
   if (action === true) {
+    // SỬA BÀN
+    console.log('Table to edit:', table);
+    console.log('Available statuses:', statuses.value);
+    console.log('Current table status_id:', table.status_id, typeof table.status_id);
+    
+    const statusOptions = statuses.value.map(s => {
+      const isSelected = String(s.id) === String(table.status_id);
+      return `<option value="${s.id}" ${isSelected ? 'selected' : ''}>${getStatusLabel(s.name)}</option>`;
+    }).join('');
+
     const { value: updates } = await Swal.fire({
       title: 'Cập nhật bàn',
       html: `
-        <div style="text-align:left">
-          <label>Tên bàn:</label>
-          <input id="edit-label" class="swal2-input" value="${table.label}">
-          <label>Số ghế:</label>
-          <input id="edit-seats" type="number" min="1" class="swal2-input" value="${table.seats}">
-          <label>Trạng thái:</label>
-          <select id="edit-status" class="swal2-select" style="width:100%; margin-top:5px;">
-            <option value="AVAILABLE" ${table.status === 'AVAILABLE' ? 'selected' : ''}>🟢 Trống (Available)</option>
-            <option value="DISABLED" ${table.status === 'DISABLED' ? 'selected' : ''}>⚫ Bảo trì (Disabled)</option>
+        <div style="text-align:left; padding: 10px;">
+          <label style="display:block; margin-bottom:5px; font-weight:600;">Số ghế:</label>
+          <input id="edit-seats" type="number" min="1" class="swal2-input" value="${table.capacity}" style="margin-top:0;">
+          
+          <label style="display:block; margin-bottom:5px; margin-top:15px; font-weight:600;">Trạng thái:</label>
+          <select id="edit-status" class="swal2-select" style="width:90%; padding:10px; border-radius:8px; border: 1px solid #d9d9d9; margin-left:5%;">
+            ${statusOptions}
           </select>
+          
+          <label style="display:block; margin-bottom:5px; margin-top:15px; font-weight:600;">Lý do bảo trì (nếu có):</label>
+          <input id="edit-reason" class="swal2-input" value="${table.disabled_reason || ''}" placeholder="Tùy chọn" style="margin-top:0;">
         </div>
       `,
+      showCancelButton: true,
+      confirmButtonText: 'Cập nhật',
+      cancelButtonText: 'Hủy',
       focusConfirm: false,
       preConfirm: () => {
-        const label = (document.getElementById('edit-label') as HTMLInputElement).value;
         const seats = parseInt((document.getElementById('edit-seats') as HTMLInputElement).value);
-        const status = (document.getElementById('edit-status') as HTMLSelectElement).value;
+        const status_id = (document.getElementById('edit-status') as HTMLSelectElement).value;
+        const reason = (document.getElementById('edit-reason') as HTMLInputElement).value;
         
-        if (!label || isNaN(seats) || seats < 1) {
-          return Swal.showValidationMessage('Thông tin không hợp lệ');
+        if (isNaN(seats) || seats < 1) {
+          return Swal.showValidationMessage('Số ghế không hợp lệ');
         }
-        return { label, seats, status };
+        return { seats, status_id, reason };
       }
     });
 
     if (updates) {
-      store.updateTable(table.id, updates);
-      Swal.fire({ icon: 'success', title: 'Cập nhật thành công', timer: 1000, showConfirmButton: false });
+      try {
+        console.log('Updating table:', {
+          id: Number(table.id),
+          payload: {
+            capacity: updates.seats,
+            status_id: updates.status_id,
+            disabled_reason: updates.reason || undefined,
+          }
+        });
+        
+        const response = await tableApi.update(Number(table.id), {
+          capacity: updates.seats,
+          status_id: updates.status_id,
+          disabled_reason: updates.reason || undefined,
+        });
+        
+        console.log('Update response:', response);
+        
+        Swal.fire({ icon: 'success', title: 'Cập nhật thành công', timer: 1500, showConfirmButton: false });
+        await loadTables();
+      } catch (error: any) {
+        console.error('Update error:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: error.response?.data?.message || 'Không thể cập nhật bàn',
+        });
+      }
     }
 
   } else if (action === false) {
-    Swal.fire({
+    // XÓA BÀN
+    const result = await Swal.fire({
       title: 'Xóa bàn này?',
       text: "Hành động này không thể hoàn tác!",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Xóa luôn!',
       confirmButtonColor: '#d33'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        store.deleteTable(table.id);
-        Swal.fire('Đã xóa!', '', 'success');
-      }
     });
+    
+    if (result.isConfirmed) {
+      try {
+        await tableApi.delete(Number(table.id));
+        Swal.fire('Đã xóa!', '', 'success');
+        await loadTables();
+      } catch (error: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: error.response?.data?.message || 'Không thể xóa bàn',
+        });
+      }
+    }
   }
 };
+
+onMounted(() => {
+  loadTables();
+  loadStatuses();
+});
 </script>
 
 <style scoped>
@@ -210,71 +246,192 @@ const handleAdminAction = async (table: any) => {
   font-family: 'Segoe UI', sans-serif;
 }
 .page-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 20px;
 }
-.header-left h2 { margin: 0; font-size: 1.8rem; color: #2c3e50; }
-.subtitle { color: #7f8c8d; margin: 4px 0 0; font-size: 0.95rem; }
+.header-left h2 { 
+  margin: 0; 
+  font-size: 1.8rem; 
+  color: #2c3e50; 
+}
+.subtitle { 
+  color: #7f8c8d; 
+  margin: 4px 0 0; 
+  font-size: 0.95rem; 
+}
 
 .btn-add {
-  background: #2ecc71; color: white; border: none; padding: 10px 20px;
-  border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  background: #2ecc71; 
+  color: white; 
+  border: none; 
+  padding: 10px 20px;
+  border-radius: 8px; 
+  font-weight: 600; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  gap: 8px;
   transition: transform 0.2s;
 }
-.btn-add:hover { background: #27ae60; transform: translateY(-2px); }
-
-.toolbar-container {
-  background: white; padding: 16px 20px; border-radius: 12px;
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 16px;
-}
-.tool-group { display: flex; align-items: center; gap: 10px; }
-.tool-group label { font-weight: 600; color: #34495e; font-size: 0.9rem; }
-.time-input, .filter-select {
-  padding: 8px 12px; border: 1px solid #dfe6e9; border-radius: 6px; outline: none;
-}
-.time-input.is-past { border-color: #e67e22; background: #fff3e0; }
-.btn-reset {
-  font-size: 0.8rem; color: #e67e22; background: none; border: 1px solid #e67e22; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+.btn-add:hover { 
+  background: #27ae60; 
+  transform: translateY(-2px); 
 }
 
-/* UPDATE: LEGEND CSS */
-.status-legend {
-  display: flex; justify-content: center; gap: 24px; margin-bottom: 20px; flex-wrap: wrap;
+.loading-text {
+  text-align: center;
+  padding: 40px;
+  font-size: 1.1rem;
+  color: #7f8c8d;
 }
-.legend-item {
-  display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 500; color: #555;
-}
-.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
 
-.legend-item.available .dot { background-color: #20c997; } /* Teal */
-.legend-item.pending .dot { background-color: #7950f2; }   /* Purple */
-.legend-item.reserved .dot { background-color: #fab005; }  /* Yellow */
-.legend-item.occupied .dot { background-color: #fa5252; }  /* Red */
-.legend-item.disabled .dot { background-color: #868e96; }  /* Grey */
-
-.history-banner {
-  background: #fff3cd; color: #856404; text-align: center; padding: 10px;
-  border-radius: 8px; margin-bottom: 20px; font-weight: bold; border: 1px solid #ffeeba;
-}
 .map-area {
-  background: white; padding: 20px; border-radius: 16px; min-height: 400px;
+  background: white; 
+  padding: 20px; 
+  border-radius: 16px; 
+  min-height: 400px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  padding: 10px;
+}
+
+.table-card {
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.table-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+
+.table-card.status-available {
+  border-color: #20c997;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+
+.table-card.status-pending {
+  border-color: #7950f2;
+  background: linear-gradient(135deg, #f3f0ff 0%, #ffffff 100%);
+}
+
+.table-card.status-reserved {
+  border-color: #fab005;
+  background: linear-gradient(135deg, #fff9db 0%, #ffffff 100%);
+}
+
+.table-card.status-occupied {
+  border-color: #fa5252;
+  background: linear-gradient(135deg, #ffe8e8 0%, #ffffff 100%);
+}
+
+.table-card.status-disabled {
+  border-color: #868e96;
+  background: linear-gradient(135deg, #f1f3f5 0%, #ffffff 100%);
+}
+
+.table-number {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.table-capacity {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  margin-bottom: 8px;
+}
+
+.table-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.status-available .table-status {
+  background: #20c997;
+  color: white;
+}
+
+.status-pending .table-status {
+  background: #7950f2;
+  color: white;
+}
+
+.status-reserved .table-status {
+  background: #fab005;
+  color: white;
+}
+
+.status-occupied .table-status {
+  background: #fa5252;
+  color: white;
+}
+
+.status-disabled .table-status {
+  background: #868e96;
+  color: white;
 }
 </style>
 
 <style>
-.swal-custom-actions { gap: 15px !important; margin-top: 25px !important; }
-.btn-swal-edit, .btn-swal-delete, .btn-swal-cancel {
-    padding: 12px 24px !important; font-weight: 600 !important; border-radius: 10px !important;
-    font-size: 1rem !important; border: none !important; cursor: pointer !important;
-    transition: all 0.2s ease-in-out !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-    outline: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
+.swal-custom-actions { 
+  gap: 15px !important; 
+  margin-top: 25px !important; 
 }
-.btn-swal-edit:hover, .btn-swal-delete:hover, .btn-swal-cancel:hover { transform: translateY(-3px) !important; }
-.btn-swal-edit { background: linear-gradient(135deg, #228be6, #1c7ed6) !important; color: white !important; }
-.btn-swal-edit:hover { box-shadow: 0 8px 15px rgba(34, 139, 230, 0.3) !important; }
-.btn-swal-delete { background: linear-gradient(135deg, #fa5252, #e03131) !important; color: white !important; }
-.btn-swal-delete:hover { box-shadow: 0 8px 15px rgba(250, 82, 82, 0.3) !important; }
-.btn-swal-cancel { background-color: #e9ecef !important; color: #495057 !important; }
-.btn-swal-cancel:hover { background-color: #dee2e6 !important; color: #212529 !important; }
+.btn-swal-edit, .btn-swal-delete, .btn-swal-cancel {
+    padding: 12px 24px !important; 
+    font-weight: 600 !important; 
+    border-radius: 10px !important;
+    font-size: 1rem !important; 
+    border: none !important; 
+    cursor: pointer !important;
+    transition: all 0.2s ease-in-out !important; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+    outline: none !important; 
+    display: inline-flex !important; 
+    align-items: center !important; 
+    justify-content: center !important;
+}
+.btn-swal-edit:hover, .btn-swal-delete:hover, .btn-swal-cancel:hover { 
+  transform: translateY(-3px) !important; 
+}
+.btn-swal-edit { 
+  background: linear-gradient(135deg, #228be6, #1c7ed6) !important; 
+  color: white !important; 
+}
+.btn-swal-edit:hover { 
+  box-shadow: 0 8px 15px rgba(34, 139, 230, 0.3) !important; 
+}
+.btn-swal-delete { 
+  background: linear-gradient(135deg, #fa5252, #e03131) !important; 
+  color: white !important; 
+}
+.btn-swal-delete:hover { 
+  box-shadow: 0 8px 15px rgba(250, 82, 82, 0.3) !important; 
+}
+.btn-swal-cancel { 
+  background-color: #e9ecef !important; 
+  color: #495057 !important; 
+}
+.btn-swal-cancel:hover { 
+  background-color: #dee2e6 !important; 
+  color: #212529 !important; 
+}
 </style>

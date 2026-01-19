@@ -4,6 +4,8 @@ import * as bcrypt from 'bcrypt';
 
 import { Role } from '../roles/entities/role.entity';
 import { User } from '../users/entities/user.entity';
+import { TableStatus } from '../tables/entities/table-status.entity';
+import { ReservationStatus } from '../reservations/entities/reservation-status.entity';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@cafe.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin123';
@@ -20,6 +22,8 @@ export class SeedService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureRoles();
+    await this.ensureTableStatuses();
+    await this.ensureReservationStatuses();
     await this.ensureAdminUser();
   }
 
@@ -32,6 +36,36 @@ export class SeedService implements OnModuleInit {
         role = roleRepository.create({ name: roleName });
         await roleRepository.save(role);
         this.logger.log(`✓ Created role '${roleName}'`);
+      }
+    }
+  }
+
+  private async ensureTableStatuses() {
+    const statusRepository = this.dataSource.getRepository(TableStatus);
+    
+    const statuses = ['AVAILABLE', 'PENDING', 'RESERVED', 'OCCUPIED', 'DISABLED'];
+    
+    for (const statusName of statuses) {
+      let status = await statusRepository.findOne({ where: { name: statusName } });
+      if (!status) {
+        status = statusRepository.create({ name: statusName });
+        await statusRepository.save(status);
+        this.logger.log(`✓ Created table status '${statusName}'`);
+      }
+    }
+  }
+
+  private async ensureReservationStatuses() {
+    const statusRepository = this.dataSource.getRepository(ReservationStatus);
+    
+    const statuses = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'];
+    
+    for (const statusName of statuses) {
+      let status = await statusRepository.findOne({ where: { name: statusName } });
+      if (!status) {
+        status = statusRepository.create({ name: statusName });
+        await statusRepository.save(status);
+        this.logger.log(`✓ Created reservation status '${statusName}'`);
       }
     }
   }

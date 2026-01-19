@@ -1,5 +1,6 @@
 // src/api/adminApi.ts
 import { httpClient } from './httpClient';
+import { tableApi } from './tableApi';
 
 // Interface cho Thống kê Dashboard (placeholder)
 export interface DashboardStats {
@@ -30,12 +31,6 @@ export interface CreateStaffDTO {
 }
 
 // Tạm thời giữ mock cho dashboard
-const mockStats: DashboardStats = {
-  totalRevenue: 15500000,
-  totalOrders: 124,
-  activeTables: 8,
-  totalStaff: 5,
-};
 
 function mapUserToStaff(user: any): Staff {
   return {
@@ -51,9 +46,22 @@ function mapUserToStaff(user: any): Staff {
 }
 
 export const adminApi = {
-  // Vẫn mock phần thống kê
+  // Thống kê dashboard: lấy thật từ backend
   async getDashboardStats(): Promise<DashboardStats> {
-    return new Promise((resolve) => setTimeout(() => resolve(mockStats), 300));
+    const [tables, staff] = await Promise.all([
+      tableApi.getAll(),
+      httpClient.get('/users/staff').then((res) => res.data?.data || []),
+    ]);
+
+    // Bàn đang phục vụ: status = 'OCCUPIED'
+    const occupiedTables = tables.filter((t: any) => t.status?.name === 'OCCUPIED').length;
+
+    return {
+      totalRevenue: 0,      // Chưa có dữ liệu doanh thu
+      totalOrders: 0,       // Chưa có dữ liệu đơn
+      activeTables: tables.length, // Hiển thị tổng số bàn
+      totalStaff: staff.length,
+    };
   },
 
   // Lấy danh sách staff từ Backend
