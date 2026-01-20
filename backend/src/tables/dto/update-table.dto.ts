@@ -1,16 +1,24 @@
-import { IsInt, Min, IsOptional, IsString } from 'class-validator';
+import { IsString, IsInt, Min, IsOptional } from 'class-validator';
 
 export class UpdateTableDto {
+  @IsString()
   @IsOptional()
+  name?: string;
+
   @IsInt()
   @Min(1)
+  @IsOptional()
   capacity?: number;
 
-  @IsOptional()
   @IsString()
+  @IsOptional()
+  type?: string;
+
+  @IsString()
+  @IsOptional()
   status_id?: string;
 
-  @IsOptional()
   @IsString()
+  @IsOptional()
   disabled_reason?: string;
 }

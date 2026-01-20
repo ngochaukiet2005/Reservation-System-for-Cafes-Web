@@ -1,29 +1,51 @@
 import { reactive } from 'vue';
+import { reservationApi, Reservation as ApiReservation } from '../api/reservationApi';
+import { tableApi } from '../api/tableApi';
 
 export interface Table {
   id: number;
   name: string;
   capacity: number;
-  status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE' | 'PENDING';
-  type: 'Indoor' | 'Outdoor' | 'VIP';
+  status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE' | 'PENDING' | 'DISABLED';
+  type?: string;
 }
 
 export interface Reservation {
   id: number;
   guestName: string;
   phone: string;
-  time: string; // ISO String
+  time: string;
   people: number;
   tableId: number | null;
   tableName?: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'REQUEST_CANCEL' | 'OCCUPIED';
   cancellationReason?: string;
-  adminResponse?: string;
+  raw?: any;
 }
 
-// --- MOCK DATA: DANH SÁCH BÀN ---
+const mapReservation = (r: any): Reservation => ({
+  id: Number(r.id),
+  guestName: r.customer_name,
+  phone: r.customer_phone,
+  time: r.reservation_time,
+  people: r.guest_count,
+  tableId: r.table_id ? Number(r.table_id) : null,
+  tableName: r.table?.name,
+  status: (r.status?.name || r.status) as Reservation['status'],
+  cancellationReason: r.cancel_reason,
+  raw: r,
+});
+
+const mapTable = (t: any): Table => ({
+  id: Number(t.id),
+  name: t.name,
+  capacity: t.capacity,
+  status: (t.status?.name || t.status) as Table['status'],
+  type: t.type,
+});
+
+// --- MOCK DATA XÓA HẾT ---
 const MOCK_TABLES_DATA: Table[] = [
-  { id: 101, name: 'Bàn 01', capacity: 2, status: 'AVAILABLE', type: 'Indoor' },
   { id: 102, name: 'Bàn 02', capacity: 2, status: 'AVAILABLE', type: 'Indoor' },
   { id: 103, name: 'Bàn 03', capacity: 4, status: 'AVAILABLE', type: 'Indoor' },
   { id: 104, name: 'Bàn 04', capacity: 4, status: 'AVAILABLE', type: 'Indoor' },
@@ -69,125 +91,114 @@ const MOCK_HISTORY: Reservation[] = [
 
 export const reservationStore = reactive({
   tables: [] as Table[],
-  reservations: [...MOCK_HISTORY] as Reservation[],
+  reservations: [] as Reservation[],
   isLoading: false,
 
-  // --- LOGIC: Lấy trạng thái bàn theo giờ ---
+  async fetchTables() {
+    this.isLoading = true;
+    try {
+      const data = await tableApi.getAll();
+      this.tables = data.map(mapTable);
+    } finally {
+      this.isLoading = false;
+    }
+    return this.tables;
+  },
+
   async fetchTablesByTime(date: string, time: string) {
     this.isLoading = true;
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Reset về mặc định
-        const currentTables = MOCK_TABLES_DATA.map(t => ({ 
-          ...t, 
-          // Giữ nguyên trạng thái bảo trì nếu có
-          status: t.status === 'MAINTENANCE' ? 'MAINTENANCE' : 'AVAILABLE' 
-        }));
+    try {
+      const iso = `${date}T${time}`;
+      await Promise.all([
+        this.fetchTables(),
+        this.fetchReservations({ date }),
+      ]);
 
-        const selectedTime = new Date(`${date}T${time}`);
-        
-        // Quét lịch sử đặt bàn
-        this.reservations.forEach(res => {
-          if (['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(res.status)) return;
-          if (!res.tableId) return;
+      const target = new Date(iso);
+      const updated = this.tables.map((t) => ({ ...t }));
 
-          const resTime = new Date(res.time);
-          // Logic: Nếu giờ chọn nằm trong khoảng [Giờ đặt - 60p, Giờ đặt + 60p]
-          const diffMinutes = Math.abs((selectedTime.getTime() - resTime.getTime()) / 60000);
-          
-          if (diffMinutes < 60) { 
-            const tableIndex = currentTables.findIndex(t => t.id === res.tableId);
-            if (tableIndex !== -1) {
-              // Nếu bàn đang bảo trì thì không ghi đè trạng thái đặt bàn
-              if (currentTables[tableIndex].status !== 'MAINTENANCE') {
-                  if (res.status === 'OCCUPIED') currentTables[tableIndex].status = 'OCCUPIED';
-                  else if (res.status === 'PENDING') currentTables[tableIndex].status = 'PENDING';
-                  else currentTables[tableIndex].status = 'RESERVED';
-              }
-            }
-          }
-        });
+      this.reservations.forEach((res) => {
+        if (['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(res.status)) return;
+        if (!res.tableId) return;
 
-        // @ts-ignore
-        this.tables = currentTables;
-        this.isLoading = false;
-        resolve(this.tables);
-      }, 300);
-    });
+        const resTime = new Date(res.time);
+        const diffMinutes = Math.abs((target.getTime() - resTime.getTime()) / 60000);
+        if (diffMinutes >= 60) return;
+
+        const tableIdx = updated.findIndex((tb) => tb.id === res.tableId);
+        if (tableIdx === -1) return;
+        if (updated[tableIdx].status === 'MAINTENANCE') return;
+
+        if (res.status === 'OCCUPIED') updated[tableIdx].status = 'OCCUPIED';
+        else if (res.status === 'PENDING') updated[tableIdx].status = 'PENDING';
+        else updated[tableIdx].status = 'RESERVED';
+      });
+
+      this.tables = updated;
+    } finally {
+      this.isLoading = false;
+    }
+    return this.tables;
   },
 
-  // --- Các hàm Action (Create, Update) giữ nguyên ---
-  async createReservation(payload: any) {
+  async fetchReservations(params?: { status?: string; date?: string }) {
     this.isLoading = true;
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newRes: Reservation = {
-          id: Date.now(),
-          ...payload,
-          status: payload.isAdmin ? (payload.initialStatus || 'CONFIRMED') : 'PENDING'
-        };
-        this.reservations.unshift(newRes); 
-        this.updateTableStatusOnUI(newRes.tableId, newRes.status);
-        this.isLoading = false;
-        resolve(newRes);
-      }, 500);
-    });
-  },
-  
-  async fetchReservations() { 
-    this.isLoading = true;
-    return new Promise((resolve) => {
-        setTimeout(() => { this.isLoading = false; resolve(this.reservations); }, 300);
-    });
+    try {
+      const data = await reservationApi.getReservations(params);
+      this.reservations = (data as any[]).map(mapReservation);
+    } finally {
+      this.isLoading = false;
+    }
+    return this.reservations;
   },
 
-  async cancelReservation(id: number, reason: string = '') {
-     const target = this.reservations.find(r => r.id === id);
-     if (target) {
-        if (['PENDING', 'REQUEST_CANCEL'].includes(target.status)) {
-            target.status = 'CANCELLED';
-            target.cancellationReason = reason;
-            this.updateTableStatusOnUI(target.tableId, 'AVAILABLE');
-        } else {
-            target.status = 'CANCELLED'; 
-            target.cancellationReason = reason;
-            this.updateTableStatusOnUI(target.tableId, 'AVAILABLE');
-        }
-     }
+  async createReservation(payload: {
+    customer_name: string;
+    customer_phone: string;
+    reservation_time: string;
+    guest_count: number;
+    table_id?: string;
+    notes?: string;
+  }) {
+    this.isLoading = true;
+    try {
+      const created = await reservationApi.createReservation(payload);
+      const mapped = mapReservation(created);
+      this.reservations.unshift(mapped);
+      if (mapped.tableId) {
+        await this.fetchTables();
+      }
+      return mapped;
+    } finally {
+      this.isLoading = false;
+    }
   },
 
   async approveReservation(id: number) {
-      const target = this.reservations.find(r => r.id === id);
-      if (target) {
-          target.status = 'CONFIRMED';
-          this.updateTableStatusOnUI(target.tableId, 'RESERVED');
-      }
+    const res = await reservationApi.confirmReservation(String(id));
+    await this.fetchReservations();
+    await this.fetchTables();
+    return res;
+  },
+
+  async cancelReservation(id: number, reason = '') {
+    const res = await reservationApi.cancelReservation(String(id), reason);
+    await this.fetchReservations();
+    await this.fetchTables();
+    return res;
   },
 
   async checkInReservation(id: number) {
-      const target = this.reservations.find(r => r.id === id);
-      if (target) {
-          target.status = 'OCCUPIED'; 
-          this.updateTableStatusOnUI(target.tableId, 'OCCUPIED');
-      }
+    const res = await reservationApi.checkIn(String(id));
+    await this.fetchReservations();
+    await this.fetchTables();
+    return res;
   },
 
   async checkOutReservation(id: number) {
-      const target = this.reservations.find(r => r.id === id);
-      if (target) {
-          target.status = 'COMPLETED';
-          this.updateTableStatusOnUI(target.tableId, 'AVAILABLE');
-      }
+    const res = await reservationApi.checkOut(String(id));
+    await this.fetchReservations();
+    await this.fetchTables();
+    return res;
   },
-
-  updateTableStatusOnUI(tableId: number | null, resStatus: string) {
-      if (!tableId) return;
-      const table = this.tables.find(t => t.id === tableId);
-      if (table && table.status !== 'MAINTENANCE') {
-          if (resStatus === 'OCCUPIED') table.status = 'OCCUPIED';
-          else if (resStatus === 'PENDING') table.status = 'PENDING';
-          else if (['CONFIRMED', 'RESERVED', 'REQUEST_CANCEL'].includes(resStatus)) table.status = 'RESERVED';
-          else table.status = 'AVAILABLE';
-      }
-  }
 });

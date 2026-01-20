@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CafeTable } from './entities/table.entity';
@@ -10,91 +10,76 @@ import { UpdateTableDto } from './dto/update-table.dto';
 export class TablesService {
   constructor(
     @InjectRepository(CafeTable)
-    private tablesRepository: Repository<CafeTable>,
+    private readonly tableRepo: Repository<CafeTable>,
     @InjectRepository(TableStatus)
-    private tableStatusRepository: Repository<TableStatus>,
+    private readonly statusRepo: Repository<TableStatus>,
   ) {}
 
-  async create(createTableDto: CreateTableDto) {
-    // Tìm status AVAILABLE (mặc định khi tạo bàn mới)
-    const availableStatus = await this.tableStatusRepository.findOne({
-      where: { name: 'AVAILABLE' },
-    });
-
-    if (!availableStatus) {
-      throw new BadRequestException('Không tìm thấy trạng thái AVAILABLE');
-    }
-
-    const newTable = this.tablesRepository.create({
-      capacity: createTableDto.capacity,
-      status_id: availableStatus.id,
-      status: availableStatus,
-    });
-
-    return this.tablesRepository.save(newTable);
+  async findAll(): Promise<CafeTable[]> {
+    return this.tableRepo.find({ relations: ['status'], order: { sort_order: 'ASC', id: 'ASC' } });
   }
 
-  async findAll() {
-    const tables = await this.tablesRepository.find({
-      relations: ['status'],
-    });
-
-    return tables;
-  }
-
-  async findOne(id: string) {
-    const table = await this.tablesRepository.findOne({
-      where: { id },
-      relations: ['status'],
-    });
-
-    if (!table) {
-      throw new NotFoundException(`Không tìm thấy bàn với ID ${id}`);
-    }
-
+  async findOne(id: string): Promise<CafeTable> {
+    const table = await this.tableRepo.findOne({ where: { id }, relations: ['status'] });
+    if (!table) throw new NotFoundException(`Table with ID ${id} not found`);
     return table;
   }
 
-  async update(id: string, updateTableDto: UpdateTableDto) {
+  async create(dto: CreateTableDto): Promise<CafeTable> {
+    // Check if name already exists
+    const existing = await this.tableRepo.findOne({ where: { name: dto.name } });
+    if (existing) {
+      throw new ConflictException(`Table with name "${dto.name}" already exists`);
+    }
+
+    // Find AVAILABLE status
+    const availableStatus = await this.statusRepo.findOne({ where: { name: 'AVAILABLE' } });
+    if (!availableStatus) {
+      throw new NotFoundException('AVAILABLE status not found. Please run seed first.');
+    }
+
+    const table = this.tableRepo.create({
+      name: dto.name,
+      capacity: dto.capacity,
+      type: dto.type,
+      status_id: availableStatus.id,
+    });
+
+    const saved = await this.tableRepo.save(table);
+    return this.findOne(saved.id);
+  }
+
+  async update(id: string, dto: UpdateTableDto): Promise<CafeTable> {
     const table = await this.findOne(id);
 
-    if (updateTableDto.capacity !== undefined) {
-      table.capacity = updateTableDto.capacity;
-    }
-
-    if (updateTableDto.status_id) {
-      const status = await this.tableStatusRepository.findOne({
-        where: { id: updateTableDto.status_id },
-      });
-
-      if (!status) {
-        throw new BadRequestException('Trạng thái không hợp lệ');
+    // Check name uniqueness if changed
+    if (dto.name && dto.name !== table.name) {
+      const existing = await this.tableRepo.findOne({ where: { name: dto.name } });
+      if (existing) {
+        throw new ConflictException(`Table with name "${dto.name}" already exists`);
       }
-
-      table.status_id = status.id;
-      table.status = status;
     }
 
-    if (updateTableDto.disabled_reason !== undefined) {
-      table.disabled_reason = updateTableDto.disabled_reason;
+    // Validate status_id if provided
+    if (dto.status_id) {
+      const status = await this.statusRepo.findOne({ where: { id: dto.status_id } });
+      if (!status) {
+        throw new NotFoundException(`Status with ID ${dto.status_id} not found`);
+      }
     }
 
+    Object.assign(table, dto);
     table.updated_at = new Date();
-
-    await this.tablesRepository.save(table);
-    
-    // Trả về table với relation status
+    await this.tableRepo.save(table);
     return this.findOne(id);
   }
 
-  async remove(id: string) {
+  async remove(id: string): Promise<void> {
     const table = await this.findOne(id);
-    await this.tablesRepository.remove(table);
-    
-    return { message: 'Xóa bàn thành công' };
+    await this.tableRepo.remove(table);
   }
 
-  async getStatuses() {
-    return this.tableStatusRepository.find();
+  async getStatuses(): Promise<TableStatus[]> {
+    return this.statusRepo.find();
   }
 }
