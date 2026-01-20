@@ -6,6 +6,9 @@ import { SeedService } from './seed/seed.service';
 import { join } from 'path';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { TablesModule } from './tables/tables.module';
+import { ReservationsModule } from './reservations/reservations.module';
+import { ReservationLogsModule } from './reservation-logs/reservation-logs.module';
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { UsersModule } from './users/users.module';
 
     UsersModule,
     AuthModule,
+    TablesModule,
+    ReservationsModule,
+    ReservationLogsModule,
   ],
   providers: [SeedService],
 })

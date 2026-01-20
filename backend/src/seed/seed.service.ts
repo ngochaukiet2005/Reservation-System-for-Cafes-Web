@@ -4,6 +4,9 @@ import * as bcrypt from 'bcrypt';
 
 import { Role } from '../roles/entities/role.entity';
 import { User } from '../users/entities/user.entity';
+import { TableStatus } from '../tables/entities/table-status.entity';
+import { ReservationStatus } from '../reservations/entities/reservation-status.entity';
+import { CafeTable } from '../tables/entities/table.entity';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@cafe.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin123';
@@ -20,7 +23,10 @@ export class SeedService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureRoles();
+    await this.ensureTableStatuses();
+    await this.ensureReservationStatuses();
     await this.ensureAdminUser();
+    await this.updateExistingTables();
   }
 
   private async ensureRoles() {
@@ -68,5 +74,51 @@ export class SeedService implements OnModuleInit {
 
     await userRepository.save(adminUser);
     this.logger.log(`✓ Created admin user: ${ADMIN_EMAIL} (password: ${ADMIN_PASSWORD})`);
+  }
+
+  private async ensureTableStatuses() {
+    const statusRepository = this.dataSource.getRepository(TableStatus);
+    const statuses = ['AVAILABLE', 'PENDING', 'RESERVED', 'OCCUPIED', 'DISABLED', 'MAINTENANCE'];
+
+    for (const statusName of statuses) {
+      let status = await statusRepository.findOne({ where: { name: statusName } });
+      if (!status) {
+        status = statusRepository.create({ name: statusName });
+        await statusRepository.save(status);
+        this.logger.log(`✓ Created table status '${statusName}'`);
+      }
+    }
+  }
+
+  private async ensureReservationStatuses() {
+    const statusRepository = this.dataSource.getRepository(ReservationStatus);
+    const statuses = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'OCCUPIED', 'REQUEST_CANCEL'];
+
+    for (const statusName of statuses) {
+      let status = await statusRepository.findOne({ where: { name: statusName } });
+      if (!status) {
+        status = statusRepository.create({ name: statusName });
+        await statusRepository.save(status);
+        this.logger.log(`✓ Created reservation status '${statusName}'`);
+      }
+    }
+  }
+
+  private async updateExistingTables() {
+    const tableRepository = this.dataSource.getRepository(CafeTable);
+    const tables = await tableRepository.find();
+
+    let updated = 0;
+    for (const table of tables) {
+      if (!table.name) {
+        table.name = `Bàn ${table.id}`;
+        await tableRepository.save(table);
+        updated++;
+      }
+    }
+
+    if (updated > 0) {
+      this.logger.log(`✓ Updated ${updated} tables with default names`);
+    }
   }
 }
