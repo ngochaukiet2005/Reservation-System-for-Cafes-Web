@@ -65,12 +65,44 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useTableStore } from '../../store/tableStore';
+import { tableApi, type Table } from '../../api/tableApi';
 import TableMap from '../../components/map/TableMap.vue';
 import Swal from 'sweetalert2';
 
-const store = useTableStore();
-onMounted(() => store.initRealTimeListener());
+const tables = ref<Table[]>([]);
+const loading = ref(true);
+const statuses = ref<Array<{ id: number; name: string }>>([]);
+
+const loadTables = async () => {
+  try {
+    loading.value = true;
+    const data = await tableApi.getAll();
+    tables.value = data;
+  } catch (error: any) {
+    console.error('Lỗi tải danh sách bàn:', error);
+    Swal.fire({
+      icon: 'error',
+      title: 'Lỗi',
+      text: error.response?.data?.message || 'Không thể tải danh sách bàn',
+    });
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadStatuses = async () => {
+  try {
+    const data = await tableApi.getStatuses();
+    statuses.value = data;
+  } catch (error) {
+    console.error('Lỗi tải trạng thái:', error);
+  }
+};
+
+onMounted(() => {
+  loadTables();
+  loadStatuses();
+});
 
 // --- LOGIC THỜI GIAN ---
 const getNowString = () => {
@@ -90,52 +122,77 @@ const isPastMode = computed(() => {
 // --- LOGIC BỘ LỌC ---
 const filterStatus = ref('ALL');
 const filteredTables = computed(() => {
-  return store.tables.filter(table => {
-    return filterStatus.value === 'ALL' || table.status === filterStatus.value;
-  });
+  return tables.value
+    .map(t => ({
+      id: t.id,
+      name: t.name,
+      label: t.name,
+      capacity: t.capacity,
+      seats: t.capacity,
+      status: t.status.name,
+      type: t.type,
+    }))
+    .filter(table => {
+      return filterStatus.value === 'ALL' || table.status === filterStatus.value;
+    });
 });
+
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    'AVAILABLE': '🟢 Trống',
+    'PENDING': '🟡 Chờ duyệt',
+    'RESERVED': '🟠 Đã đặt',
+    'OCCUPIED': '🔴 Có khách',
+    'DISABLED': '⚫ Bảo trì',
+    'MAINTENANCE': '⚫ Bảo trì',
+  };
+  return labels[status] || status;
+};
 
 // --- ACTIONS ---
 const openAddModal = async () => {
   const { value: form } = await Swal.fire({
     title: 'Thêm bàn mới',
     html: `
-      <input id="swal-label" class="swal2-input" placeholder="Tên bàn">
+      <input id="swal-name" class="swal2-input" placeholder="Tên bàn (vd: Bàn 01)">
       <input id="swal-seats" type="number" min="1" class="swal2-input" placeholder="Số ghế">
+      <input id="swal-type" class="swal2-input" placeholder="Loại bàn (Indoor/Outdoor/VIP - tùy chọn)">
     `,
     showCancelButton: true,
     confirmButtonText: 'Tạo bàn',
     preConfirm: () => {
-      const label = (document.getElementById('swal-label') as HTMLInputElement).value;
+      const name = (document.getElementById('swal-name') as HTMLInputElement).value.trim();
       const seats = parseInt((document.getElementById('swal-seats') as HTMLInputElement).value);
-      if (!label || isNaN(seats) || seats < 1) {
-        return Swal.showValidationMessage('Vui lòng nhập tên và số ghế lớn hơn 0');
+      const type = (document.getElementById('swal-type') as HTMLInputElement).value.trim();
+      if (!name) {
+        return Swal.showValidationMessage('Vui lòng nhập tên bàn');
       }
-      return { label, seats };
+      if (isNaN(seats) || seats < 1) {
+        return Swal.showValidationMessage('Vui lòng nhập số ghế lớn hơn 0');
+      }
+      return { name, seats, type: type || undefined };
     }
   });
 
   if (form) {
-    store.addTable(form);
-    Swal.fire({ icon: 'success', title: 'Đã thêm bàn!', timer: 1000, showConfirmButton: false });
+    try {
+      await tableApi.create({ name: form.name, capacity: form.seats, type: form.type });
+      Swal.fire({ icon: 'success', title: 'Đã thêm bàn!', timer: 1500, showConfirmButton: false });
+      await loadTables();
+    } catch (error: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: error.response?.data?.message || 'Không thể tạo bàn',
+      });
+    }
   }
 };
 
 const handleAdminAction = async (table: any) => {
-  const editableStatus = ['AVAILABLE', 'DISABLED'];
-  
-  if (!editableStatus.includes(table.status)) {
-    return Swal.fire({
-      icon: 'warning',
-      title: 'Không thể can thiệp',
-      text: `Bàn đang ở trạng thái "${table.status}". Chỉ bàn Trống hoặc Bảo trì mới có thể thay đổi thiết lập.`,
-      confirmButtonText: 'Đã hiểu'
-    });
-  }
-
   const { value: action } = await Swal.fire({
-    title: `Quản lý ${table.label}`,
-    text: `Trạng thái hiện tại: ${table.status}`,
+    title: `Quản lý Bàn ${table.name}`,
+    text: `Trạng thái: ${getStatusLabel(table.status)} - ${table.capacity} ghế`,
     showDenyButton: true,
     showCancelButton: true,
     confirmButtonText: '📝 Sửa thông tin',
@@ -151,53 +208,103 @@ const handleAdminAction = async (table: any) => {
   });
 
   if (action === true) {
+    // SỬA BÀN
+    const fullTable = tables.value.find(t => t.id === table.id);
+    if (!fullTable) return;
+
+    const statusOptions = statuses.value.map(s => {
+      const isSelected = String(s.id) === String(fullTable.status_id);
+      return `<option value="${s.id}" ${isSelected ? 'selected' : ''}>${getStatusLabel(s.name)}</option>`;
+    }).join('');
+
     const { value: updates } = await Swal.fire({
       title: 'Cập nhật bàn',
       html: `
-        <div style="text-align:left">
-          <label>Tên bàn:</label>
-          <input id="edit-label" class="swal2-input" value="${table.label}">
-          <label>Số ghế:</label>
-          <input id="edit-seats" type="number" min="1" class="swal2-input" value="${table.seats}">
-          <label>Trạng thái:</label>
-          <select id="edit-status" class="swal2-select" style="width:100%; margin-top:5px;">
-            <option value="AVAILABLE" ${table.status === 'AVAILABLE' ? 'selected' : ''}>🟢 Trống (Available)</option>
-            <option value="DISABLED" ${table.status === 'DISABLED' ? 'selected' : ''}>⚫ Bảo trì (Disabled)</option>
+        <div style="text-align:left; padding: 10px;">
+          <label style="display:block; margin-bottom:5px; font-weight:600;">Tên bàn:</label>
+          <input id="edit-name" class="swal2-input" value="${fullTable.name || ''}" placeholder="Bàn 01" style="margin-top:0;">
+
+          <label style="display:block; margin-bottom:5px; margin-top:12px; font-weight:600;">Số ghế:</label>
+          <input id="edit-seats" type="number" min="1" class="swal2-input" value="${fullTable.capacity}" style="margin-top:0;">
+
+          <label style="display:block; margin-bottom:5px; margin-top:12px; font-weight:600;">Loại bàn:</label>
+          <input id="edit-type" class="swal2-input" value="${fullTable.type || ''}" placeholder="Indoor/Outdoor/VIP" style="margin-top:0;">
+          
+          <label style="display:block; margin-bottom:5px; margin-top:15px; font-weight:600;">Trạng thái:</label>
+          <select id="edit-status" class="swal2-select" style="width:90%; padding:10px; border-radius:8px; border: 1px solid #d9d9d9; margin-left:5%;">
+            ${statusOptions}
           </select>
+          
+          <label style="display:block; margin-bottom:5px; margin-top:15px; font-weight:600;">Lý do bảo trì (nếu có):</label>
+          <input id="edit-reason" class="swal2-input" value="${fullTable.disabled_reason || ''}" placeholder="Tùy chọn" style="margin-top:0;">
         </div>
       `,
+      showCancelButton: true,
+      confirmButtonText: 'Cập nhật',
+      cancelButtonText: 'Hủy',
       focusConfirm: false,
       preConfirm: () => {
-        const label = (document.getElementById('edit-label') as HTMLInputElement).value;
+        const name = (document.getElementById('edit-name') as HTMLInputElement).value.trim();
         const seats = parseInt((document.getElementById('edit-seats') as HTMLInputElement).value);
-        const status = (document.getElementById('edit-status') as HTMLSelectElement).value;
+        const status_id = (document.getElementById('edit-status') as HTMLSelectElement).value;
+        const reason = (document.getElementById('edit-reason') as HTMLInputElement).value;
+        const type = (document.getElementById('edit-type') as HTMLInputElement).value.trim();
         
-        if (!label || isNaN(seats) || seats < 1) {
-          return Swal.showValidationMessage('Thông tin không hợp lệ');
+        if (!name) {
+          return Swal.showValidationMessage('Tên bàn không được để trống');
         }
-        return { label, seats, status };
+        if (isNaN(seats) || seats < 1) {
+          return Swal.showValidationMessage('Số ghế không hợp lệ');
+        }
+        return { name, seats, status_id, reason, type: type || undefined };
       }
     });
 
     if (updates) {
-      store.updateTable(table.id, updates);
-      Swal.fire({ icon: 'success', title: 'Cập nhật thành công', timer: 1000, showConfirmButton: false });
+      try {
+        await tableApi.update(Number(fullTable.id), {
+          name: updates.name,
+          capacity: updates.seats,
+          type: updates.type,
+          status_id: updates.status_id,
+          disabled_reason: updates.reason || undefined,
+        });
+        
+        Swal.fire({ icon: 'success', title: 'Cập nhật thành công', timer: 1500, showConfirmButton: false });
+        await loadTables();
+      } catch (error: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: error.response?.data?.message || 'Không thể cập nhật bàn',
+        });
+      }
     }
-
   } else if (action === false) {
-    Swal.fire({
-      title: 'Xóa bàn này?',
-      text: "Hành động này không thể hoàn tác!",
+    // XÓA BÀN
+    const confirmDelete = await Swal.fire({
+      title: 'Xác nhận xóa bàn',
+      text: `Bạn có chắc chắn muốn xóa ${table.name}? Hành động này không thể hoàn tác!`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Xóa luôn!',
-      confirmButtonColor: '#d33'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        store.deleteTable(table.id);
-        Swal.fire('Đã xóa!', '', 'success');
-      }
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#d33',
     });
+
+    if (confirmDelete.isConfirmed) {
+      try {
+        await tableApi.delete(Number(table.id));
+        Swal.fire({ icon: 'success', title: 'Đã xóa bàn!', timer: 1500, showConfirmButton: false });
+        await loadTables();
+      } catch (error: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: error.response?.data?.message || 'Không thể xóa bàn',
+        });
+      }
+    }
   }
 };
 </script>
