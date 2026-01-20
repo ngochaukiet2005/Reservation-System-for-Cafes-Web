@@ -42,36 +42,6 @@ export class SeedService implements OnModuleInit {
     }
   }
 
-  private async ensureTableStatuses() {
-    const statusRepository = this.dataSource.getRepository(TableStatus);
-    
-    const statuses = ['AVAILABLE', 'PENDING', 'RESERVED', 'OCCUPIED', 'DISABLED'];
-    
-    for (const statusName of statuses) {
-      let status = await statusRepository.findOne({ where: { name: statusName } });
-      if (!status) {
-        status = statusRepository.create({ name: statusName });
-        await statusRepository.save(status);
-        this.logger.log(`✓ Created table status '${statusName}'`);
-      }
-    }
-  }
-
-  private async ensureReservationStatuses() {
-    const statusRepository = this.dataSource.getRepository(ReservationStatus);
-    
-    const statuses = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'];
-    
-    for (const statusName of statuses) {
-      let status = await statusRepository.findOne({ where: { name: statusName } });
-      if (!status) {
-        status = statusRepository.create({ name: statusName });
-        await statusRepository.save(status);
-        this.logger.log(`✓ Created reservation status '${statusName}'`);
-      }
-    }
-  }
-
   private async ensureAdminUser() {
     const roleRepository = this.dataSource.getRepository(Role);
     const userRepository = this.dataSource.getRepository(User);

@@ -43,6 +43,7 @@ export class TablesController {
   async update(@Param('id') id: string, @Body() dto: UpdateTableDto) {
     const table = await this.tablesService.update(id, dto);
     return { message: 'Table updated successfully', data: table };
+  }
 
   @Delete(':id')
   @Roles('ADMIN')

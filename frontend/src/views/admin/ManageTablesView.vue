@@ -23,7 +23,7 @@
           :class="`status-${table.status.name.toLowerCase()}`"
           @click="handleAdminAction(table)"
         >
-          <div class="table-number">Bàn #{{ table.id }}</div>
+          <div class="table-number">{{ table.name || `Bàn #${table.id}` }}</div>
           <div class="table-capacity">{{ table.capacity }} ghế</div>
           <div class="table-status">{{ getStatusLabel(table.status.name) }}</div>
         </div>
@@ -73,32 +73,6 @@ onMounted(() => {
   loadTables();
   loadStatuses();
 });
-
-const loadTables = async () => {
-  try {
-    loading.value = true;
-    const data = await tableApi.getAll();
-    tables.value = data;
-  } catch (error: any) {
-    console.error('Lỗi tải danh sách bàn:', error);
-    Swal.fire({
-      icon: 'error',
-      title: 'Lỗi',
-      text: error.response?.data?.message || 'Không thể tải danh sách bàn',
-    });
-  } finally {
-    loading.value = false;
-  }
-};
-
-const loadStatuses = async () => {
-  try {
-    const data = await tableApi.getStatuses();
-    statuses.value = data;
-  } catch (error) {
-    console.error('Lỗi tải trạng thái:', error);
-  }
-};
 
 // --- LOGIC BỘ LỌC ---
 const filterStatus = ref('ALL');
