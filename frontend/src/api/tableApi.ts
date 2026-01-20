@@ -26,6 +26,7 @@ export interface UpdateTablePayload {
   capacity?: number;
   status_id?: string;
   disabled_reason?: string;
+
   name?: string;
   type?: string;
 }

@@ -24,7 +24,7 @@
       <div class="stat-card tables">
         <div class="icon">🪑</div>
         <div class="info">
-          <h3>Bàn đang phục vụ</h3>
+          <h3>Tổng số bàn</h3>
           <p>{{ stats.activeTables }} bàn</p>
         </div>
       </div>

@@ -20,3 +20,8 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
 }
 </style>
+
+curl -X POST http://localhost:3000/users/staff ^
+ -H "Content-Type: application/json" ^
+ -H "Authorization: Bearer TOKEN" ^
+ -d "{ \"email\":\"staff@cafe.com\", \"password\":\"staff123\", \"user_name\":\"Nguyễn Văn A\", \"phone_number\":\"0901234567\" }"

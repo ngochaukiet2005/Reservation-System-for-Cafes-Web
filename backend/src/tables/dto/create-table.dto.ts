@@ -4,6 +4,7 @@ export class CreateTableDto {
   @IsString()
   name!: string;
 
+
   @IsInt()
   @Min(1)
   capacity!: number;

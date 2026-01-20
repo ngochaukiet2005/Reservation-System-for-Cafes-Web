@@ -18,10 +18,10 @@ const AVATAR_MALE = 'https://cdn-icons-png.flaticon.com/512/4042/4042356.png';
 const AVATAR_FEMALE = 'https://cdn-icons-png.flaticon.com/512/4042/4042422.png'; 
 
 export const authStore = reactive({
-  // --- KHỞI TẠO STATE TỪ LOCAL STORAGE ---
-  token: localStorage.getItem('auth_token') || '',
-  user: JSON.parse(localStorage.getItem('auth_user') || 'null') as User | null,
-  isAuthenticated: !!localStorage.getItem('auth_token'), // Kiểm tra token thay vì user
+  // --- KHỞI TẠO STATE TỪ SESSION STORAGE (Clear khi tắt tab) ---
+  token: sessionStorage.getItem('auth_token') || '',
+  user: JSON.parse(sessionStorage.getItem('auth_user') || 'null') as User | null,
+  isAuthenticated: !!sessionStorage.getItem('auth_token'), // Kiểm tra token thay vì user
   
   isLoading: false,
 
@@ -45,7 +45,7 @@ export const authStore = reactive({
       );
 
       this.token = token;
-      localStorage.setItem('auth_token', token);
+      sessionStorage.setItem('auth_token', token);
       
       this.isLoading = false;
       return true;
@@ -79,7 +79,7 @@ export const authStore = reactive({
       );
 
       this.token = token;
-      localStorage.setItem('auth_token', token);
+      sessionStorage.setItem('auth_token', token);
 
       this.isLoading = false;
       return true;
@@ -120,8 +120,8 @@ export const authStore = reactive({
           }
         }
         
-        // Cập nhật lại localStorage
-        localStorage.setItem('auth_user', JSON.stringify(this.user));
+        // Cập nhật lại sessionStorage
+        sessionStorage.setItem('auth_user', JSON.stringify(this.user));
       }
       
       this.isLoading = false;
@@ -139,16 +139,16 @@ export const authStore = reactive({
     this.user = null;
     this.isAuthenticated = false;
 
-    // Xóa sạch localStorage để F5 không bị load lại
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
+    // Xóa sạch sessionStorage để F5 không bị load lại
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_user');
   },
 
   // --- SET USER ---
   setUser(id: number, name: string, email: string, phone: string, gender: 'Nam'|'Nữ', role: any, avatar: string) {
     this.user = { id, name, email, phone, gender, role, avatar };
     this.isAuthenticated = true;
-    localStorage.setItem('auth_user', JSON.stringify(this.user));
+    sessionStorage.setItem('auth_user', JSON.stringify(this.user));
   },
 
   // ... (Các hàm Mock khác giữ nguyên)

@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
+
 @Controller('tables')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TablesController {
@@ -15,6 +16,7 @@ export class TablesController {
   async findAll() {
     const tables = await this.tablesService.findAll();
     return { message: 'Tables retrieved successfully', data: tables };
+
   }
 
   @Get('statuses')
@@ -41,7 +43,6 @@ export class TablesController {
   async update(@Param('id') id: string, @Body() dto: UpdateTableDto) {
     const table = await this.tablesService.update(id, dto);
     return { message: 'Table updated successfully', data: table };
-  }
 
   @Delete(':id')
   @Roles('ADMIN')

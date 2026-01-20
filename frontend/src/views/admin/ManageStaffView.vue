@@ -170,7 +170,8 @@ const openAddStaffModal = async () => {
         confirmButtonColor: '#3498db'
       });
     } catch (error) {
-      Swal.fire('Lỗi', 'Không thể tạo nhân viên', 'error');
+      const message = (error as any)?.message || (error as any)?.response?.data?.message || 'Không thể tạo nhân viên';
+      Swal.fire('Lỗi', message, 'error');
     }
   }
 };
