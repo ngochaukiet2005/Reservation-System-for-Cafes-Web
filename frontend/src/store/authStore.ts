@@ -18,10 +18,10 @@ const AVATAR_MALE = 'https://cdn-icons-png.flaticon.com/512/4042/4042356.png';
 const AVATAR_FEMALE = 'https://cdn-icons-png.flaticon.com/512/4042/4042422.png'; 
 
 export const authStore = reactive({
-  // --- KHỞI TẠO STATE TỪ SESSION STORAGE (Clear khi tắt tab) ---
-  token: sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || '',
-  user: JSON.parse(sessionStorage.getItem('auth_user') || localStorage.getItem('auth_user') || 'null') as User | null,
-  isAuthenticated: !!(sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token')),
+  // --- KHỞI TẠO STATE TỪ SESSION STORAGE (mỗi tab riêng) ---
+  token: sessionStorage.getItem('auth_token') || '',
+  user: JSON.parse(sessionStorage.getItem('auth_user') || 'null') as User | null,
+  isAuthenticated: !!sessionStorage.getItem('auth_token'),
   
   isLoading: false,
 
@@ -46,7 +46,6 @@ export const authStore = reactive({
 
       this.token = token;
       sessionStorage.setItem('auth_token', token);
-      localStorage.setItem('auth_token', token);
       
       this.isLoading = false;
       return true;
@@ -81,7 +80,6 @@ export const authStore = reactive({
 
       this.token = token;
       sessionStorage.setItem('auth_token', token);
-      localStorage.setItem('auth_token', token);
 
       this.isLoading = false;
       return true;
@@ -144,8 +142,6 @@ export const authStore = reactive({
     // Xóa sạch sessionStorage để F5 không bị load lại
     sessionStorage.removeItem('auth_token');
     sessionStorage.removeItem('auth_user');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
   },
 
   // --- SET USER ---
@@ -154,7 +150,6 @@ export const authStore = reactive({
     this.isAuthenticated = true;
     const serialized = JSON.stringify(this.user);
     sessionStorage.setItem('auth_user', serialized);
-    localStorage.setItem('auth_user', serialized);
   },
 
   // ... (Các hàm Mock khác giữ nguyên)
