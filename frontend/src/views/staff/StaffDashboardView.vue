@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-layout" @click="closeUserMenu">
+  <div class="dashboard-layout" @click="closeAllDropdowns">
     
     <div v-if="showUserMenu || showHourDropdown || showMinuteDropdown || showListHourDropdown || showListMinuteDropdown" class="click-overlay" @click="closeAllDropdowns"></div>
 
@@ -150,11 +150,12 @@
                   </td>
                   <td class="actions-cell text-right">
                     <div v-if="item.status === 'PENDING'" class="action-group">
-                      <button @click="handleApprove(item)" class="btn-icon success">✔</button>
-                      <button @click="handleReject(item)" class="btn-icon danger">✕</button>
+                      <button @click="handleApprove(item)" class="btn-icon success" title="Duyệt đơn">✔</button>
+                      <button @click="handleReject(item)" class="btn-icon danger" title="Từ chối">✕</button>
                     </div>
                     <div v-else-if="item.status === 'REQUEST_CANCEL'" class="action-group">
-                      <button @click="handleApproveCancel(item)" class="btn-sm btn-danger-outline">Đồng ý Hủy</button>
+                      <button @click="handleApproveCancel(item)" class="btn-sm btn-success" title="Đồng ý hủy">Đồng ý Hủy</button>
+                      <button @click="handleRejectCancel(item)" class="btn-sm btn-danger-outline" title="Từ chối hủy">Từ Chối Hủy</button>
                     </div>
                     <div v-else-if="item.status === 'CONFIRMED'" class="action-group">
                       <button @click="handleCheckIn(item)" class="btn-sm btn-primary">Check-in</button>
@@ -379,9 +380,61 @@ const filteredReservations = computed(() => {
   return data.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 });
 
-const handleApprove = async (item: any) => { await reservationStore.approveReservation(item.id); Swal.fire('Duyệt thành công', '', 'success'); };
-const handleReject = async (item: any) => { const { value: reason } = await Swal.fire({ input: 'text', title: 'Lý do hủy', showCancelButton: true }); if (reason) { await reservationStore.cancelReservation(item.id, reason); Swal.fire('Đã hủy', '', 'info'); } };
-const handleApproveCancel = async (item: any) => { await reservationStore.cancelReservation(item.id, 'Staff approved cancel'); Swal.fire('Đã chấp nhận hủy', '', 'success'); };
+const handleApprove = async (item: any) => { 
+  try {
+    await reservationStore.approveReservation(item.id);
+    Swal.fire({ icon: 'success', title: 'Duyệt thành công', text: `Đơn #${item.id} đã được xác nhận`, timer: 2000, showConfirmButton: false });
+  } catch (err: any) {
+    Swal.fire({ icon: 'error', title: 'Lỗi', text: err.message || 'Không thể duyệt đơn' });
+  }
+};
+
+const handleReject = async (item: any) => { 
+  const { value: reason } = await Swal.fire({ 
+    input: 'textarea',
+    title: 'Lý do từ chối/hủy', 
+    inputPlaceholder: 'Nhập lý do...',
+    showCancelButton: true,
+    confirmButtonText: 'Xác Nhận',
+    cancelButtonText: 'Hủy'
+  }); 
+  if (reason !== undefined && reason !== null) {
+    try {
+      await reservationStore.cancelReservation(item.id, reason || 'Staff từ chối');
+      Swal.fire({ icon: 'info', title: 'Đã hủy', timer: 2000, showConfirmButton: false });
+    } catch (err: any) {
+      Swal.fire({ icon: 'error', title: 'Lỗi', text: err.message || 'Không thể hủy đơn' });
+    }
+  }
+};
+
+const handleApproveCancel = async (item: any) => { 
+  try {
+    await reservationStore.approveCancelRequest(item.id);
+    Swal.fire({ icon: 'success', title: 'Đã chấp nhận hủy', text: `Đơn #${item.id} đã hủy`, timer: 2000, showConfirmButton: false });
+  } catch (err: any) {
+    Swal.fire({ icon: 'error', title: 'Lỗi', text: err.message || 'Không thể xử lý hủy' });
+  }
+};
+
+const handleRejectCancel = async (item: any) => {
+  const { value: reason } = await Swal.fire({
+    input: 'textarea',
+    title: 'Lý do từ chối hủy',
+    inputPlaceholder: 'Nhập lý do từ chối hủy đơn...',
+    showCancelButton: true,
+    confirmButtonText: 'Xác Nhận',
+    cancelButtonText: 'Hủy'
+  });
+  if (reason !== undefined && reason !== null) {
+    try {
+      await reservationStore.rejectCancelRequest(item.id, reason || 'Staff từ chối hủy');
+      Swal.fire({ icon: 'success', title: 'Đã từ chối hủy', text: 'Đơn quay lại trạng thái xác nhận', timer: 2000, showConfirmButton: false });
+    } catch (err: any) {
+      Swal.fire({ icon: 'error', title: 'Lỗi', text: err.message || 'Không thể xử lý' });
+    }
+  }
+};
 const handleCheckIn = async (item: any) => { await reservationStore.checkInReservation(item.id); Swal.fire('Check-in xong', '', 'success'); };
 const handleCheckOut = async (item: any) => { await reservationStore.checkOutReservation(item.id); Swal.fire('Check-out xong', '', 'success'); };
 
@@ -546,6 +599,7 @@ const handleTableClick = async (table: any) => {
 const openCreateModal = () => { selectedTableForAction.value = null; showCreateModal.value = true; };
 const closeModal = () => { showCreateModal.value = false; selectedTableForAction.value = null; };
 const openEditProfile = () => { showEditProfileModal.value = true; showUserMenu.value = false; };
+const closeUserMenu = () => { showUserMenu.value = false; };
 
 const handleStaffCreateReservation = async (formData: any) => {
     await reservationStore.createReservation({
@@ -640,6 +694,7 @@ onMounted(() => {
 .status-badge.confirmed { background: #d4edda; color: #155724; }
 .status-badge.occupied { background: #cce5ff; color: #004085; }
 .status-badge.cancelled { background: #f8d7da; color: #721c24; }
+.status-badge.request_cancel { background: #ffe5e5; color: #d63031; }
 .note-text { font-size: 0.75rem; color: #c0392b; margin-top: 4px; font-style: italic; max-width: 150px; }
 
 /* MAP STYLES */
