@@ -271,7 +271,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { authStore } from '../../store/authStore';
@@ -625,9 +625,24 @@ const handleLogout = () => {
     closeUserMenu(); 
 };
 
+let staffPollId: any = null;
+
 onMounted(() => { 
     reservationStore.fetchReservations(); 
     resetToNow();
+    if (!staffPollId) {
+        staffPollId = setInterval(() => {
+            reservationStore.fetchReservations();
+            refreshMap();
+        }, 15000);
+    }
+});
+
+onUnmounted(() => {
+    if (staffPollId) {
+        clearInterval(staffPollId);
+        staffPollId = null;
+    }
 });
 </script>
 

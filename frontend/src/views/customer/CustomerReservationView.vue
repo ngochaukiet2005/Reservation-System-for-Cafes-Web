@@ -127,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { reservationStore, type Table } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
@@ -277,6 +277,20 @@ onMounted(() => {
         }
     }
     loadTables();
+    if (!customerPollId) {
+        customerPollId = setInterval(() => {
+            loadTables();
+        }, 15000);
+    }
+});
+
+let customerPollId: any = null;
+
+onUnmounted(() => {
+    if (customerPollId) {
+        clearInterval(customerPollId);
+        customerPollId = null;
+    }
 });
 </script>
 
