@@ -14,9 +14,9 @@ export class UpdateTableDto {
   @IsOptional()
   type?: string;
 
-  @IsString()
+  @IsInt()
   @IsOptional()
-  status_id?: string;
+  status_id?: number; // Accept number from frontend
 
   @IsString()
   @IsOptional()

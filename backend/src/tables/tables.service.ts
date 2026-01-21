@@ -61,14 +61,22 @@ export class TablesService {
     }
 
     // Validate status_id if provided
-    if (dto.status_id) {
-      const status = await this.statusRepo.findOne({ where: { id: dto.status_id } });
+    if (dto.status_id !== undefined) {
+      const statusId = String(dto.status_id); // Convert number to string for bigint comparison
+      const status = await this.statusRepo.findOne({ where: { id: statusId } });
       if (!status) {
         throw new NotFoundException(`Status with ID ${dto.status_id} not found`);
       }
+      table.status = status;
+      table.status_id = status.id;
     }
 
-    Object.assign(table, dto);
+    Object.assign(table, {
+      name: dto.name ?? table.name,
+      capacity: dto.capacity ?? table.capacity,
+      type: dto.type ?? table.type,
+      disabled_reason: dto.disabled_reason ?? table.disabled_reason,
+    });
     table.updated_at = new Date();
     await this.tableRepo.save(table);
     return this.findOne(id);
