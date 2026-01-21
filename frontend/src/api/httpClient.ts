@@ -13,7 +13,7 @@ export const httpClient = axios.create({
 
 // Thêm token vào header cho mỗi request
 httpClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+  const token = sessionStorage.getItem('auth_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -26,11 +26,9 @@ httpClient.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     if (status === 401) {
-      // Dọn token ở cả session lẫn local để tránh lặp lại lỗi
+      // Dọn token ở session
       sessionStorage.removeItem('auth_token');
       sessionStorage.removeItem('auth_user');
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
 
       // Chỉ redirect nếu chưa ở trang login
       if (router.currentRoute.value.path !== '/login') {
