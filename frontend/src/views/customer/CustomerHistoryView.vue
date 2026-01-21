@@ -134,7 +134,7 @@
               <div v-if="res.status === 'REQUEST_CANCEL'" class="sub-status warning">
                 <small>⏳ Đợi Staff duyệt</small>
               </div>
-              <div v-if="res.adminResponse && res.status === 'CONFIRMED'" class="sub-status error" @click="showRejectReason(res.adminResponse)">
+              <div v-if="res.raw?.adminResponse?.toString() && res.status === 'CONFIRMED'" class="sub-status error" @click="showRejectReason(res.raw.adminResponse as string)">
                 <small>⚠️ Staff từ chối hủy (Xem)</small>
               </div>
             </td>
@@ -182,7 +182,7 @@
           <div class="detail-row"><strong>🕒 Thời gian:</strong> {{ formatDate(selectedDetailRes.time) }} - {{ formatTime(selectedDetailRes.time) }}</div>
           <div class="detail-row"><strong>📍 Bàn:</strong> {{ selectedDetailRes.tableName }} ({{ selectedDetailRes.people }} người)</div>
           <div class="detail-row reason-box" v-if="selectedDetailRes.cancellationReason"><strong>Lý do hủy của bạn:</strong> <br>"{{ selectedDetailRes.cancellationReason }}"</div>
-           <div class="detail-row reason-box admin" v-if="selectedDetailRes.adminResponse"><strong>💬 Phản hồi từ Staff:</strong> <br>"{{ selectedDetailRes.adminResponse }}"</div>
+           <div class="detail-row reason-box admin" v-if="selectedDetailRes?.raw?.adminResponse"><strong>💬 Phản hồi từ Staff:</strong> <br>"{{ selectedDetailRes.raw.adminResponse }}"</div>
           <div class="modal-actions"><button class="btn-primary" @click="showDetailModal = false">Đóng</button></div>
         </div>
       </div>
@@ -313,23 +313,20 @@ const showRejectReason = (reason: string) => {
 };
 
 const onCancelClick = async (res: any) => {
-  const reservationTime = new Date(res.time).getTime();
-  const now = new Date().getTime();
-  const holdTimeMs = 30 * 60 * 1000; 
-
-  if (now > reservationTime + holdTimeMs) {
-    Swal.fire({ icon: 'error', title: 'Không thể hủy', text: 'Đã quá thời gian giữ bàn. Vui lòng liên hệ hotline.', });
-    return;
-  }
-
+  // Khách hàng có thể hủy nếu đơn chưa được xác nhận (PENDING)
   if (res.status === 'PENDING') {
     const result = await Swal.fire({
       title: 'Hủy đơn chờ?', text: "Bạn có chắc chắn muốn hủy đơn đang chờ duyệt này không?", icon: 'warning',
       showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Đồng ý hủy', cancelButtonText: 'Quay lại'
     });
     if (result.isConfirmed) {
-      await reservationStore.cancelReservation(res.id, 'Khách chủ động hủy đơn chờ');
-      Swal.fire('Đã hủy!', 'Đơn của bạn đã được hủy thành công.', 'success');
+      try {
+        await reservationStore.cancelReservation(res.id, 'Khách chủ động hủy đơn chờ');
+        await reservationStore.fetchReservations(); // Refresh danh sách
+        Swal.fire('Đã hủy!', 'Đơn của bạn đã được hủy thành công.', 'success');
+      } catch (error: any) {
+        Swal.fire({ icon: 'error', title: 'Lỗi', text: error.message || 'Không thể hủy đơn' });
+      }
     }
     return;
   }
@@ -346,9 +343,14 @@ const closeCancelModal = () => { showCancelModal.value = false; selectedCancelRe
 const confirmCancelRequest = async () => {
   if (!cancelReason.value.trim()) { Swal.fire('Thiếu thông tin', 'Vui lòng nhập lý do hủy!', 'warning'); return; }
   if (selectedCancelRes.value) {
-    await reservationStore.cancelReservation(selectedCancelRes.value.id, cancelReason.value);
-    closeCancelModal();
-    Swal.fire({ icon: 'success', title: 'Đã gửi yêu cầu', text: 'Yêu cầu hủy đang chờ nhân viên xác nhận.', timer: 2000, showConfirmButton: false });
+    try {
+      await reservationStore.cancelReservation(selectedCancelRes.value.id, cancelReason.value);
+      await reservationStore.fetchReservations(); // Refresh danh sách
+      closeCancelModal();
+      Swal.fire({ icon: 'success', title: 'Đã gửi yêu cầu', text: 'Yêu cầu hủy đang chờ nhân viên xác nhận.', timer: 2000, showConfirmButton: false });
+    } catch (error: any) {
+      Swal.fire({ icon: 'error', title: 'Lỗi', text: error.message || 'Không thể hủy đơn' });
+    }
   }
 };
 
