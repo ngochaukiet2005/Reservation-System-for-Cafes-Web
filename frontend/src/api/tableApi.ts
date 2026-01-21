@@ -24,7 +24,7 @@ export interface CreateTablePayload {
 
 export interface UpdateTablePayload {
   capacity?: number;
-  status_id?: string;
+  status_id?: number;
   disabled_reason?: string;
 
   name?: string;

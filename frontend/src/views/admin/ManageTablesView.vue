@@ -66,6 +66,7 @@ const loadStatuses = async () => {
     statuses.value = data;
   } catch (error) {
     console.error('Lỗi tải trạng thái:', error);
+    Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Không thể tải danh sách trạng thái bàn. Vui lòng đăng nhập lại.' });
   }
 };
 
@@ -167,6 +168,15 @@ const handleAdminAction = async (table: any) => {
     const fullTable = tables.value.find(t => t.id === table.id);
     if (!fullTable) return;
 
+    // Đảm bảo đã có danh sách trạng thái trước khi mở form
+    if (!statuses.value.length) {
+      await loadStatuses();
+      if (!statuses.value.length) {
+        Swal.fire({ icon: 'error', title: 'Thiếu dữ liệu', text: 'Không tải được trạng thái bàn. Vui lòng thử lại sau.' });
+        return;
+      }
+    }
+
     const statusOptions = statuses.value.map(s => {
       const isSelected = String(s.id) === String(fullTable.status_id);
       return `<option value="${s.id}" ${isSelected ? 'selected' : ''}>${getStatusLabel(s.name)}</option>`;
@@ -201,7 +211,7 @@ const handleAdminAction = async (table: any) => {
       preConfirm: () => {
         const name = (document.getElementById('edit-name') as HTMLInputElement).value.trim();
         const seats = parseInt((document.getElementById('edit-seats') as HTMLInputElement).value);
-        const status_id = (document.getElementById('edit-status') as HTMLSelectElement).value;
+        const status_id = Number((document.getElementById('edit-status') as HTMLSelectElement).value);
         const reason = (document.getElementById('edit-reason') as HTMLInputElement).value;
         const type = (document.getElementById('edit-type') as HTMLInputElement).value.trim();
         
@@ -217,14 +227,19 @@ const handleAdminAction = async (table: any) => {
 
     if (updates) {
       try {
-        await tableApi.update(Number(fullTable.id), {
+        const updatedTable = await tableApi.update(Number(fullTable.id), {
           name: updates.name,
           capacity: updates.seats,
           type: updates.type,
-          status_id: updates.status_id,
+          status_id: Number(updates.status_id),
           disabled_reason: updates.reason || undefined,
         });
-        
+        // Cập nhật ngay trong local state để hiển thị tức thì
+        const idx = tables.value.findIndex(t => t.id === fullTable.id);
+        if (idx !== -1) {
+          tables.value[idx] = updatedTable;
+        }
+
         Swal.fire({ icon: 'success', title: 'Cập nhật thành công', timer: 1500, showConfirmButton: false });
         await loadTables();
       } catch (error: any) {

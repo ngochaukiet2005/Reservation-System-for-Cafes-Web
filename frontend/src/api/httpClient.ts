@@ -1,4 +1,5 @@
 import axios from 'axios';
+import router from '../router';
 
 // Support both env keys from docs/code and provide a sensible default
 const API_BASE_URL =
@@ -18,3 +19,24 @@ httpClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Nếu token hết hạn hoặc thiếu -> tự động chuyển về trang đăng nhập
+httpClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401) {
+      // Dọn token ở cả session lẫn local để tránh lặp lại lỗi
+      sessionStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_user');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+
+      // Chỉ redirect nếu chưa ở trang login
+      if (router.currentRoute.value.path !== '/login') {
+        router.replace({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } });
+      }
+    }
+    return Promise.reject(error);
+  },
+);
