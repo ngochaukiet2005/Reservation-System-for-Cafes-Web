@@ -78,7 +78,7 @@ export class SeedService implements OnModuleInit {
 
   private async ensureTableStatuses() {
     const statusRepository = this.dataSource.getRepository(TableStatus);
-    const statuses = ['AVAILABLE', 'PENDING', 'RESERVED', 'OCCUPIED', 'DISABLED', 'MAINTENANCE'];
+    const statuses = ['AVAILABLE', 'PENDING', 'RESERVED', 'OCCUPIED', 'MAINTENANCE'];
 
     for (const statusName of statuses) {
       let status = await statusRepository.findOne({ where: { name: statusName } });
