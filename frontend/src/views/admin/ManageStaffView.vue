@@ -61,6 +61,13 @@
                   <span v-if="staff.status === 'ACTIVE'">🔒</span>
                   <span v-else>🔓</span>
                 </button>
+                <button 
+                  class="btn-icon text-danger" 
+                  @click="deleteStaff(staff)"
+                  title="Xóa tài khoản"
+                >
+                  🗑️
+                </button>
               </td>
             </tr>
           </tbody>
@@ -196,6 +203,33 @@ const toggleStatus = async (staff: Staff) => {
       staffList.value[index].status = newStatus as 'ACTIVE' | 'LOCKED';
     }
     Swal.fire('Đã cập nhật!', `Tài khoản đã được ${actionName}.`, 'success');
+  }
+};
+
+const deleteStaff = async (staff: Staff) => {
+  const result = await Swal.fire({
+    title: 'Xác nhận xóa?',
+    text: `Bạn chắc chắn muốn xóa tài khoản ${staff.email} không? Hành động này không thể hoàn tác.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#e74c3c',
+    cancelButtonColor: '#95a5a6',
+    confirmButtonText: 'Xóa',
+    cancelButtonText: 'Hủy'
+  });
+
+  if (result.isConfirmed) {
+    try {
+      await adminApi.deleteStaff(staff.id);
+      const index = staffList.value.findIndex(s => s.id === staff.id);
+      if (index !== -1) {
+        staffList.value.splice(index, 1);
+      }
+      Swal.fire('Đã xóa!', `Tài khoản ${staff.email} đã được xóa thành công.`, 'success');
+    } catch (error) {
+      const message = (error as any)?.message || 'Không thể xóa nhân viên';
+      Swal.fire('Lỗi', message, 'error');
+    }
   }
 };
 
@@ -370,6 +404,14 @@ onMounted(() => {
 
 .btn-icon:hover {
   background-color: #edf2f7;
+}
+
+.text-danger:hover {
+  color: #e74c3c;
+}
+
+.text-success:hover {
+  color: #27ae60;
 }
 
 .loading-cell {
