@@ -20,6 +20,7 @@ export interface Staff {
   status: 'ACTIVE' | 'LOCKED';
   role: 'STAFF';
   createdAt: string;
+  plainPassword?: string;
 }
 
 // DTO từ form tạo mới
@@ -42,6 +43,7 @@ function mapUserToStaff(user: any): Staff {
     status: user.is_locked ? 'LOCKED' : 'ACTIVE',
     role: 'STAFF',
     createdAt: (user.created_at || '').toString().substring(0, 10),
+    plainPassword: user.plain_password,
   };
 }
 
@@ -72,7 +74,7 @@ export const adminApi = {
   },
 
   // Tạo nhân viên qua Backend
-  async createStaff(data: CreateStaffDTO): Promise<Staff> {
+  async createStaff(data: CreateStaffDTO): Promise<Staff & { plainPassword?: string }> {
     try {
       const payload = {
         email: data.email,
@@ -82,7 +84,11 @@ export const adminApi = {
       };
       const res = await httpClient.post('/users/staff', payload);
       const user = res.data?.data;
-      return mapUserToStaff(user);
+      const staff = mapUserToStaff(user);
+      return {
+        ...staff,
+        plainPassword: res.data?.plainPassword || data.password, // Thêm mật khẩu gốc
+      };
     } catch (err: any) {
       const msg = err?.response?.data?.message || 'Không thể tạo nhân viên';
       throw new Error(Array.isArray(msg) ? msg.join('\n') : msg);

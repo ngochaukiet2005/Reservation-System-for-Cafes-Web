@@ -85,6 +85,7 @@ export class UsersService {
     const user = this.usersRepository.create({
       email,
       password: hashedPassword,
+      plain_password: password,
       user_name: userName,
       phone_number: phoneNumber,
       role_id: staffRole.id,
