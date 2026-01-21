@@ -35,11 +35,12 @@ export class UsersController {
       createStaffDto.phone_number,
     );
 
-    // Không trả về password
+    // Không trả về password hash, nhưng trả về password gốc để hiển thị cho admin
     const { password, ...result } = staff;
     return {
       message: 'Tạo tài khoản nhân viên thành công',
       data: result,
+      plainPassword: createStaffDto.password, // Mật khẩu gốc để admin lưu
     };
   }
 

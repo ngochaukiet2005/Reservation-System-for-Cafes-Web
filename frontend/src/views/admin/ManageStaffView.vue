@@ -18,15 +18,16 @@
               <th width="5%">ID</th>
               <th width="25%">Họ và Tên</th>
               <th width="30%">Email (Tài khoản)</th>
-              <th width="15%">Số điện thoại</th>
-              <th width="10%">Ngày tạo</th>
-              <th width="10%">Trạng thái</th>
+              <th width="15%">Mật khẩu</th>
+              <th width="10%">Số điện thoại</th>
+              <th width="8%">Ngày tạo</th>
+              <th width="7%">Trạng thái</th>
               <th width="5%" class="text-right">Hành động</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="7" class="loading-cell">
+              <td colspan="8" class="loading-cell">
                 <div class="spinner"></div> Đang tải dữ liệu...
               </td>
             </tr>
@@ -43,6 +44,11 @@
               </td>
               <td>
                 <div class="email-text">{{ staff.email }}</div>
+              </td>
+              <td>
+                <div class="password-cell">
+                  <code class="pwd-chip">{{ staff.plainPassword || '(chưa lưu)' }}</code>
+                </div>
               </td>
               <td>{{ staff.phone }}</td>
               <td class="text-gray">{{ staff.createdAt }}</td>
@@ -168,13 +174,42 @@ const openAddStaffModal = async () => {
 
   if (formValues) {
     try {
-      const newStaff = await adminApi.createStaff(formValues);
-      staffList.value.push(newStaff); 
-      Swal.fire({
+      const response = await adminApi.createStaff(formValues);
+      staffList.value.push(response); 
+      
+      // Hiển thị mật khẩu để admin copy
+      const plainPassword = (response as any).plainPassword || formValues.password;
+      await Swal.fire({
         icon: 'success',
-        title: 'Thành công',
-        text: `Đã tạo tài khoản cho: ${newStaff.email}`,
-        confirmButtonColor: '#3498db'
+        title: 'Tạo tài khoản thành công',
+        html: `
+          <div style="text-align: left; margin: 20px 0;">
+            <p><strong>Email:</strong> ${response.email}</p>
+            <p><strong>Họ và tên:</strong> ${response.fullName}</p>
+            <div style="background-color: #f8f9fa; padding: 12px; border-radius: 6px; margin: 16px 0;">
+              <p style="margin: 0 0 8px 0;"><strong>Mật khẩu:</strong></p>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <code style="background: white; padding: 8px 12px; border-radius: 4px; border: 1px solid #e0e0e0; flex: 1;">${plainPassword}</code>
+                <button id="copy-password-btn" style="background: #3498db; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">Copy</button>
+              </div>
+            </div>
+            <p style="color: #e74c3c; font-size: 12px; margin: 12px 0 0 0;"><strong>⚠️ Lưu ý:</strong> Hãy ghi lại mật khẩu này. Nó sẽ không hiển thị lại.</p>
+          </div>
+        `,
+        confirmButtonColor: '#3498db',
+        confirmButtonText: 'Đã lưu',
+        didOpen: () => {
+          const copyBtn = document.getElementById('copy-password-btn');
+          if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+              navigator.clipboard.writeText(plainPassword);
+              copyBtn.textContent = '✓ Đã copy';
+              setTimeout(() => {
+                copyBtn.textContent = 'Copy';
+              }, 2000);
+            });
+          }
+        }
       });
     } catch (error) {
       const message = (error as any)?.message || (error as any)?.response?.data?.message || 'Không thể tạo nhân viên';
@@ -336,6 +371,21 @@ onMounted(() => {
 
 .custom-table tbody tr:hover {
   background-color: #f8fafc;
+}
+
+.password-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pwd-chip {
+  background-color: #f7fafc;
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #2d3748;
 }
 
 /* 4. Cell Components */

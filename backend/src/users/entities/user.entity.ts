@@ -19,6 +19,9 @@ export class User {
   @Column({ type: 'varchar', length: 255 })
   password!: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  plain_password?: string;
+
   @Column({ type: 'varchar', length: 100 })
   user_name!: string;
 
