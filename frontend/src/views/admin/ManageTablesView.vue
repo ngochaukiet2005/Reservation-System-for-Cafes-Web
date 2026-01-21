@@ -12,20 +12,58 @@
       </button>
     </div>
 
+    <!-- Time Filter for Live Status View -->
+    <div class="filters-admin">
+      <div class="filter-item">
+        <label>Ngày</label>
+        <input type="date" v-model="adminFilter.date" :min="today" @change="loadLiveTableStatus">
+      </div>
+
+      <div class="filter-item">
+        <label>Thời gian</label>
+        <div class="time-group">
+          <select v-model="adminFilter.hour" @change="loadLiveTableStatus">
+            <option v-for="h in availableAdminHours" :key="h" :value="h">
+              {{ h.toString().padStart(2, '0') }} giờ
+            </option>
+          </select>
+          
+          <span class="colon">:</span>
+          
+          <select v-model="adminFilter.minute" @change="loadLiveTableStatus">
+            <option v-for="m in 60" :key="m-1" :value="m-1">
+              {{ (m-1).toString().padStart(2, '0') }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-item action-col">
+        <button class="btn-reset" @click="resetAdminFilter">HIỆN TẠI</button>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-text">Đang tải dữ liệu...</div>
 
     <div v-else class="map-area">
+      <div class="legend-admin">
+        <span><i class="dot available"></i> Trống</span>
+        <span><i class="dot pending"></i> Chờ duyệt</span>
+        <span><i class="dot reserved"></i> Có đặt</span>
+        <span><i class="dot occupied"></i> Có khách</span>
+        <span><i class="dot maintenance"></i> Bảo trì</span>
+      </div>
       <div class="tables-grid">
         <div 
-          v-for="table in tables" 
+          v-for="table in displayTables" 
           :key="table.id"
           class="table-card"
-          :class="`status-${table.status.name.toLowerCase()}`"
+          :class="`status-${getStatusClass(table.status)}`"
           @click="handleAdminAction(table)"
         >
           <div class="table-number">{{ table.name || `Bàn #${table.id}` }}</div>
           <div class="table-capacity">{{ table.capacity }} ghế</div>
-          <div class="table-status">{{ getStatusLabel(table.status.name) }}</div>
+          <div class="table-status">{{ getStatusLabel(table.status) }}</div>
         </div>
       </div>
     </div>
@@ -34,20 +72,73 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue';
 import { tableApi, type Table } from '../../api/tableApi';
+import { reservationStore } from '../../store/reservationStore';
 import TableMap from '../../components/map/TableMap.vue';
 import Swal from 'sweetalert2';
 
+const today = new Date().toISOString().split('T')[0];
 const tables = ref<Table[]>([]);
 const loading = ref(true);
 const statuses = ref<Array<{ id: number; name: string }>>([]);
+
+// Admin live view filter
+const adminFilter = reactive({
+  date: today,
+  hour: new Date().getHours(),
+  minute: new Date().getMinutes()
+});
+
+const OPEN_HOUR = 8;
+const CLOSE_HOUR = 22;
+
+const availableAdminHours = computed(() => {
+  const hours = [];
+  for (let h = OPEN_HOUR; h <= CLOSE_HOUR; h++) {
+    hours.push(h);
+  }
+  return hours;
+});
+
+const displayTables = computed(() => {
+  return reservationStore.tables.map(t => ({
+    id: t.id,
+    name: t.name,
+    capacity: t.capacity,
+    status: t.status,
+    type: t.type
+  }));
+});
+
+const resetAdminFilter = () => {
+  const now = new Date();
+  if (now.getHours() >= CLOSE_HOUR) {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    adminFilter.date = tomorrow.toISOString().split('T')[0];
+    adminFilter.hour = OPEN_HOUR;
+    adminFilter.minute = 0;
+  } else {
+    adminFilter.date = today;
+    adminFilter.hour = now.getHours();
+    adminFilter.minute = now.getMinutes();
+  }
+  loadLiveTableStatus();
+};
+
+const loadLiveTableStatus = async () => {
+  const timeStr = `${adminFilter.hour.toString().padStart(2, '0')}:${adminFilter.minute.toString().padStart(2, '0')}`;
+  await reservationStore.fetchTablesByTime(adminFilter.date, timeStr);
+};
 
 const loadTables = async () => {
   try {
     loading.value = true;
     const data = await tableApi.getAll();
     tables.value = data;
+    // Also load live status
+    await loadLiveTableStatus();
   } catch (error: any) {
     console.error('Lỗi tải danh sách bàn:', error);
     Swal.fire({
@@ -70,36 +161,18 @@ const loadStatuses = async () => {
   }
 };
 
-onMounted(() => {
-  loadTables();
-  loadStatuses();
-});
-
-// --- LOGIC BỘ LỌC ---
-const filterStatus = ref('ALL');
-const filteredTables = computed(() => {
-  return tables.value
-    .map(t => ({
-      id: t.id,
-      name: t.name,
-      label: t.name,
-      capacity: t.capacity,
-      seats: t.capacity,
-      status: t.status.name,
-      type: t.type,
-    }))
-    .filter(table => {
-      return filterStatus.value === 'ALL' || table.status === filterStatus.value;
-    });
-});
+const getStatusClass = (status: string): string => {
+  return status.toLowerCase();
+};
 
 const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
     'AVAILABLE': '🟢 Trống',
     'PENDING': '🟡 Chờ duyệt',
-    'RESERVED': '🟠 Đã đặt',
+    'RESERVED': '🟠 Có đặt',
     'OCCUPIED': '🔴 Có khách',
     'MAINTENANCE': '⚫ Bảo trì',
+    'DISABLED': '⚪ Vô hiệu'
   };
   return labels[status] || status;
 };
@@ -280,9 +353,24 @@ const handleAdminAction = async (table: any) => {
   }
 };
 
+let adminPollId: any = null;
+
 onMounted(() => {
   loadTables();
   loadStatuses();
+  // Auto-sync Admin view with live reservations every 10s
+  if (!adminPollId) {
+    adminPollId = setInterval(() => {
+      loadLiveTableStatus();
+    }, 10000);
+  }
+});
+
+onUnmounted(() => {
+  if (adminPollId) {
+    clearInterval(adminPollId);
+    adminPollId = null;
+  }
 });
 </script>
 
@@ -335,6 +423,96 @@ onMounted(() => {
   color: #7f8c8d;
 }
 
+/* ADMIN FILTER STYLES */
+.filters-admin {
+  display: flex;
+  gap: 20px;
+  background: #fff;
+  padding: 15px 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  align-items: flex-end;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+  flex-wrap: wrap;
+}
+.filter-item {
+  display: flex;
+  flex-direction: column;
+}
+.filter-item label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #555;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+.filter-item input,
+.filter-item select {
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+}
+.filter-item input:focus,
+.filter-item select:focus {
+  border-color: #a67c52;
+}
+.time-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-group select {
+  width: 90px;
+}
+.colon {
+  font-weight: bold;
+}
+.filter-item.action-col {
+  justify-content: flex-end;
+}
+.btn-reset {
+  height: 42px;
+  padding: 0 20px;
+  background: #34495e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+.btn-reset:hover {
+  background: #2c3e50;
+}
+
+/* LEGEND STYLES */
+.legend-admin {
+  display: flex;
+  gap: 15px;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+  margin-bottom: 15px;
+}
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+.dot.available { background: #20c997; }
+.dot.pending { background: #7950f2; }
+.dot.reserved { background: #fab005; }
+.dot.occupied { background: #fa5252; }
+.dot.maintenance { background: #868e96; }
+
 .map-area {
   background: white; 
   padding: 20px; 
@@ -384,6 +562,11 @@ onMounted(() => {
 .table-card.status-occupied {
   border-color: #fa5252;
   background: linear-gradient(135deg, #ffe8e8 0%, #ffffff 100%);
+}
+
+.table-card.status-maintenance {
+  border-color: #868e96;
+  background: linear-gradient(135deg, #f1f3f5 0%, #ffffff 100%);
 }
 
 .table-card.status-disabled {
