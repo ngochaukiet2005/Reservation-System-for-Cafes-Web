@@ -101,4 +101,14 @@ export const adminApi = {
       throw new Error(Array.isArray(msg) ? msg.join('\n') : msg);
     }
   },
+
+  // Xóa nhân viên
+  async deleteStaff(id: number): Promise<void> {
+    try {
+      await httpClient.delete(`/users/staff/${id}`);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Không thể xóa nhân viên';
+      throw new Error(Array.isArray(msg) ? msg.join('\n') : msg);
+    }
+  },
 };
