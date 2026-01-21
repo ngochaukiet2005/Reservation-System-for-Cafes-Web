@@ -192,10 +192,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { reservationStore } from '../../store/reservationStore';
 import StatusBadge from '../../components/common/StatusBadge.vue';
 import Swal from 'sweetalert2';
+import { getSocket } from '../../realtime/socket';
 
 // State
 const filterStatus = ref('');
@@ -231,6 +232,8 @@ const selectedCancelRes = ref<any>(null);
 // Modal Chi tiết
 const showDetailModal = ref(false);
 const selectedDetailRes = ref<any>(null);
+
+let historySocket: any = null;
 
 const filteredReservations = computed(() => {
   return reservationStore.reservations.filter(res => {
@@ -354,7 +357,23 @@ const confirmCancelRequest = async () => {
   }
 };
 
-onMounted(() => { reservationStore.fetchReservations(); });
+onMounted(() => {
+  reservationStore.fetchReservations();
+  if (!historySocket) {
+    historySocket = getSocket();
+    const refresh = () => reservationStore.fetchReservations();
+    historySocket.on('reservation.updated', refresh);
+    historySocket.on('reservation.cancelled', refresh);
+  }
+});
+
+onUnmounted(() => {
+  if (historySocket) {
+    historySocket.off('reservation.updated');
+    historySocket.off('reservation.cancelled');
+    historySocket = null;
+  }
+});
 </script>
 
 <style scoped>

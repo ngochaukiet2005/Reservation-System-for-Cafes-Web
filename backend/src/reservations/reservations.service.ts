@@ -5,6 +5,7 @@ import { Reservation } from './entities/reservation.entity';
 import { ReservationStatus } from './entities/reservation-status.entity';
 import { CafeTable } from '../tables/entities/table.entity';
 import { User } from '../users/entities/user.entity';
+import { ReservationsGateway } from './reservations.gateway';
 
 @Injectable()
 export class ReservationsService {
@@ -17,6 +18,7 @@ export class ReservationsService {
     private readonly tableRepo: Repository<CafeTable>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly reservationsGateway: ReservationsGateway,
   ) {}
 
   async findAll(filters?: { status?: string; date?: string }): Promise<Reservation[]> {
@@ -89,10 +91,12 @@ export class ReservationsService {
 
     const savedReservation = await this.reservationRepo.save(reservation);
     // Reload with relations để get đầy đủ data
-    return this.reservationRepo.findOne({
+    const reloaded = await this.reservationRepo.findOne({
       where: { id: savedReservation.id },
       relations: ['table', 'customer', 'status'],
     });
+    this.reservationsGateway.emitReservation('reservation.created', reloaded);
+    return reloaded;
   }
 
   async update(id: string, dto: any): Promise<Reservation> {
@@ -146,7 +150,7 @@ export class ReservationsService {
       where: { id },
       relations: ['table', 'customer', 'status'],
     });
-    
+    this.reservationsGateway.emitReservation('reservation.cancelled', reloaded);
     console.log(`[CANCEL] Reloaded status: ${reloaded?.status?.name}`);
     return reloaded;
   }
@@ -177,7 +181,7 @@ export class ReservationsService {
       where: { id },
       relations: ['table', 'customer', 'status'],
     });
-    
+    this.reservationsGateway.emitReservation('reservation.updated', reloaded);
     console.log(`[CONFIRM] Reloaded reservation status_id: ${reloaded?.status_id}, status name: ${reloaded?.status?.name}`);
     return reloaded;
   }
@@ -207,7 +211,7 @@ export class ReservationsService {
       where: { id },
       relations: ['table', 'customer', 'status'],
     });
-    
+    this.reservationsGateway.emitReservation('reservation.updated', reloaded);
     console.log(`[CHECK-IN] Reloaded status: ${reloaded?.status?.name}`);
     return reloaded;
   }
@@ -237,7 +241,7 @@ export class ReservationsService {
       where: { id },
       relations: ['table', 'customer', 'status'],
     });
-    
+    this.reservationsGateway.emitReservation('reservation.updated', reloaded);
     console.log(`[CHECK-OUT] Reloaded status: ${reloaded?.status?.name}`);
     return reloaded;
   }
@@ -267,7 +271,7 @@ export class ReservationsService {
         where: { id },
         relations: ['table', 'customer', 'status'],
       });
-      
+      this.reservationsGateway.emitReservation('reservation.cancelled', reloaded);
       console.log(`[APPROVE-CANCEL] Reloaded status: ${reloaded?.status?.name}`);
       return reloaded;
     }
@@ -296,7 +300,7 @@ export class ReservationsService {
         where: { id },
         relations: ['table', 'customer', 'status'],
       });
-      
+      this.reservationsGateway.emitReservation('reservation.updated', reloaded);
       console.log(`[REJECT-CANCEL] Reloaded status: ${reloaded?.status?.name}`);
       return reloaded;
     }

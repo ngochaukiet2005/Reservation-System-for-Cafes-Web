@@ -279,6 +279,7 @@ import { reservationStore } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
 import EditProfileModal from '../../components/EditProfileModal.vue';
 import TableMap from '../../components/map/TableMap.vue'; // IMPORT
+import { getSocket } from '../../realtime/socket';
 
 const router = useRouter();
 
@@ -626,10 +627,18 @@ const handleLogout = () => {
 };
 
 let staffPollId: any = null;
+let staffSocket: any = null;
 
 onMounted(() => { 
     reservationStore.fetchReservations(); 
     resetToNow();
+  if (!staffSocket) {
+    staffSocket = getSocket();
+    const refresh = () => { reservationStore.fetchReservations(); refreshMap(); };
+    staffSocket.on('reservation.created', refresh);
+    staffSocket.on('reservation.updated', refresh);
+    staffSocket.on('reservation.cancelled', refresh);
+  }
     if (!staffPollId) {
         staffPollId = setInterval(() => {
             reservationStore.fetchReservations();
@@ -643,6 +652,12 @@ onUnmounted(() => {
         clearInterval(staffPollId);
         staffPollId = null;
     }
+  if (staffSocket) {
+    staffSocket.off('reservation.created');
+    staffSocket.off('reservation.updated');
+    staffSocket.off('reservation.cancelled');
+    staffSocket = null;
+  }
 });
 </script>
 
