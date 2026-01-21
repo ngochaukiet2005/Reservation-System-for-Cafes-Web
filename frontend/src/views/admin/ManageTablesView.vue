@@ -99,7 +99,6 @@ const getStatusLabel = (status: string) => {
     'PENDING': '🟡 Chờ duyệt',
     'RESERVED': '🟠 Đã đặt',
     'OCCUPIED': '🔴 Có khách',
-    'DISABLED': '⚫ Bảo trì',
     'MAINTENANCE': '⚫ Bảo trì',
   };
   return labels[status] || status;
@@ -177,10 +176,12 @@ const handleAdminAction = async (table: any) => {
       }
     }
 
-    const statusOptions = statuses.value.map(s => {
-      const isSelected = String(s.id) === String(fullTable.status_id);
-      return `<option value="${s.id}" ${isSelected ? 'selected' : ''}>${getStatusLabel(s.name)}</option>`;
-    }).join('');
+    const statusOptions = statuses.value
+      .filter(s => s.name !== 'DISABLED') // Chỉ giữ MAINTENANCE, loại DISABLED
+      .map(s => {
+        const isSelected = String(s.id) === String(fullTable.status_id);
+        return `<option value="${s.id}" ${isSelected ? 'selected' : ''}>${getStatusLabel(s.name)}</option>`;
+      }).join('');
 
     const { value: updates } = await Swal.fire({
       title: 'Cập nhật bàn',
