@@ -77,6 +77,7 @@ import { tableApi, type Table } from '../../api/tableApi';
 import { reservationStore } from '../../store/reservationStore';
 import TableMap from '../../components/map/TableMap.vue';
 import Swal from 'sweetalert2';
+import { getSocket } from '../../realtime/socket';
 
 const today = new Date().toISOString().split('T')[0];
 const tables = ref<Table[]>([]);
@@ -354,10 +355,19 @@ const handleAdminAction = async (table: any) => {
 };
 
 let adminPollId: any = null;
+let adminSocket: any = null;
 
 onMounted(() => {
   loadTables();
   loadStatuses();
+  if (!adminSocket) {
+    adminSocket = getSocket();
+    const refreshLive = () => loadLiveTableStatus();
+    adminSocket.on('reservation.created', refreshLive);
+    adminSocket.on('reservation.updated', refreshLive);
+    adminSocket.on('reservation.cancelled', refreshLive);
+    adminSocket.on('table.updated', refreshLive);
+  }
   // Auto-sync Admin view with live reservations every 10s
   if (!adminPollId) {
     adminPollId = setInterval(() => {
@@ -370,6 +380,13 @@ onUnmounted(() => {
   if (adminPollId) {
     clearInterval(adminPollId);
     adminPollId = null;
+  }
+  if (adminSocket) {
+    adminSocket.off('reservation.created');
+    adminSocket.off('reservation.updated');
+    adminSocket.off('reservation.cancelled');
+    adminSocket.off('table.updated');
+    adminSocket = null;
   }
 });
 </script>

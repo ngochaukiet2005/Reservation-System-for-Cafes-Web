@@ -132,6 +132,7 @@ import { useRouter } from 'vue-router';
 import { reservationStore, type Table } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
 import TableMap from '../../components/map/TableMap.vue'; // IMPORT
+import { getSocket } from '../../realtime/socket';
 
 const router = useRouter();
 const today = new Date().toISOString().split('T')[0];
@@ -155,6 +156,9 @@ const currentSystemTime = reactive({
     hour: new Date().getHours(),
     minute: new Date().getMinutes()
 });
+
+let customerSocket: any = null;
+let customerPollId: any = null;
 
 setInterval(() => {
     const now = new Date();
@@ -277,20 +281,31 @@ onMounted(() => {
         }
     }
     loadTables();
-    if (!customerPollId) {
-        customerPollId = setInterval(() => {
-            loadTables();
-        }, 15000);
-    }
+  if (!customerPollId) {
+    customerPollId = setInterval(() => {
+      loadTables();
+    }, 15000);
+  }
+  if (!customerSocket) {
+    customerSocket = getSocket();
+    const refresh = () => loadTables();
+    customerSocket.on('reservation.created', refresh);
+    customerSocket.on('reservation.updated', refresh);
+    customerSocket.on('reservation.cancelled', refresh);
+  }
 });
-
-let customerPollId: any = null;
 
 onUnmounted(() => {
     if (customerPollId) {
         clearInterval(customerPollId);
         customerPollId = null;
     }
+  if (customerSocket) {
+    customerSocket.off('reservation.created');
+    customerSocket.off('reservation.updated');
+    customerSocket.off('reservation.cancelled');
+    customerSocket = null;
+  }
 });
 </script>
 
