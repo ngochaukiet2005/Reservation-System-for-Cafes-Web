@@ -1,83 +1,116 @@
-# Hệ thống Quản lý Đặt bàn Quán Cà phê (Reservation System for Cafes)
+# Hệ thống Quản lý Đặt bàn Quán Cà phê (Cafe Reservation System)
 
 ## Tổng quan Dự án
-Đây là ứng dụng web nhằm hỗ trợ quản lý quy trình đặt bàn tại quán cà phê, giúp tối ưu hóa việc sắp xếp chỗ ngồi cho khách hàng và quản lý lịch làm việc cho nhân viên. Hệ thống cung cấp giải pháp toàn diện kết nối giữa Khách hàng, Nhân viên phục vụ và Quản trị viên.
-
-Dự án được xây dựng theo kiến trúc RESTful API với Backend xử lý logic và Frontend hiển thị giao diện người dùng (SPA).
+Đây là ứng dụng web toàn diện hỗ trợ quản lý quy trình đặt bàn tại quán cà phê. Hệ thống được thiết kế để kết nối ba đối tượng người dùng: Khách hàng (Customer), Nhân viên (Staff), và Quản trị viên (Admin). Dự án sử dụng kiến trúc phân tách rõ ràng giữa Backend (NestJS API) và Frontend (Vue 3 SPA), hỗ trợ cập nhật trạng thái thời gian thực thông qua WebSockets.
 
 ## Công nghệ Sử dụng
 
-### Frontend (Giao diện)
-- Vue 3 (Composition API): Xây dựng giao diện người dùng.
-- TypeScript: Đảm bảo kiểu dữ liệu chặt chẽ.
-- Vite: Công cụ build và môi trường phát triển siêu tốc.
-- Pinia: Quản lý trạng thái (State Management).
-- Vue Router: Quản lý điều hướng trang.
-- CSS/SCSS: Tùy chỉnh giao diện và hiệu ứng.
+### Backend (Máy chủ API)
+* **Framework:** NestJS (Node.js)
+* **Ngôn ngữ:** TypeScript
+* **Cơ sở dữ liệu:** PostgreSQL
+* **ORM:** TypeORM (Tương tác cơ sở dữ liệu)
+* **Xác thực:** Passport, JWT (JSON Web Token), BCrypt
+* **Real-time:** Socket.IO (NestJS WebSockets)
+* **Validation:** class-validator, class-transformer
 
-### Backend (Máy chủ)
-- NestJS: Framework Node.js xây dựng API.
-- TypeScript: Ngôn ngữ chính.
-- PostgreSQL: Hệ quản trị cơ sở dữ liệu quan hệ.
-- TypeORM: Tương tác với cơ sở dữ liệu.
-- JWT (JSON Web Token): Xác thực và phân quyền người dùng.
+### Frontend (Giao diện người dùng)
+* **Framework:** Vue 3 (Composition API)
+* **Ngôn ngữ:** TypeScript
+* **Build Tool:** Vite
+* **State Management:** Pinia
+* **Routing:** Vue Router
+* **HTTP Client:** Axios
+* **Real-time Client:** Socket.io-client
+* **UI/Notifications:** SweetAlert2, CSS/SCSS
 
-### Hạ tầng & Công cụ khác
-- Docker & Docker Compose: Đóng gói môi trường triển khai.
-- Git: Quản lý phiên bản mã nguồn.
+## Các Chức năng Chính
 
-## Các Tính năng Chính
+Hệ thống được chia thành các module chức năng dựa trên vai trò người dùng:
 
-### 1. Dành cho Khách hàng (Customer)
-- Đăng ký và Đăng nhập tài khoản (bao gồm quên mật khẩu, đổi mật khẩu).
-- Quản lý hồ sơ cá nhân (cập nhật thông tin, ảnh đại diện, giới tính).
-- Xem thực đơn và thông tin quán.
-- Đặt bàn trực tuyến (chọn thời gian, số lượng người, vị trí bàn).
-- Xem lịch sử đặt bàn.
+### 1. Phân hệ Chung & Xác thực (Auth Module)
+* Đăng ký tài khoản (Dành cho Customer).
+* Đăng nhập hệ thống (Hỗ trợ Admin, Staff, Customer).
+* Quản lý hồ sơ cá nhân.
+* Cơ chế phân quyền (Guard & Decorators) để bảo vệ API.
 
-### 2. Dành cho Nhân viên (Staff)
-- Dashboard làm việc cho nhân viên.
-- Tiếp nhận và xử lý yêu cầu đặt bàn (Duyệt/Từ chối).
-- Hỗ trợ Check-in/Check-out cho khách hàng tại quán.
-- Kiểm tra trạng thái bàn (Trống/Đang có khách).
+### 2. Phân hệ Khách hàng (Customer)
+* Đặt bàn trực tuyến: Chọn ngày, giờ, số lượng người.
+* Xem lịch sử đặt bàn cá nhân.
+* Theo dõi trạng thái đơn đặt bàn hiện tại.
 
-### 3. Dành cho Quản trị viên (Admin)
-- Quản lý toàn bộ hệ thống.
-- Quản lý danh sách bàn (Thêm/Sửa/Xóa bàn, thiết lập khu vực).
-- Quản lý tài khoản nhân viên.
-- Xem báo cáo thống kê hoạt động.
+### 3. Phân hệ Nhân viên (Staff)
+* Dashboard làm việc của nhân viên.
+* Quản lý danh sách đặt bàn.
+* Bản đồ bàn (TableMap): Hiển thị trạng thái bàn trực quan.
+* Nhận cập nhật trạng thái đặt bàn thời gian thực (Real-time).
 
-## Hướng dẫn Cài đặt và Chạy Dự án
-
-### Yêu cầu hệ thống
-- Node.js (phiên bản 18 trở lên)
-- PostgreSQL (hoặc Docker để chạy container Database)
-- npm hoặc yarn
-
-### Khởi chạy Backend
-1. Di chuyển vào thư mục backend:
-   cd backend
-2. Cài đặt các gói phụ thuộc:
-   npm install
-3. Cấu hình biến môi trường:
-   Sao chép file .env.example thành .env và cập nhật thông tin Database.
-4. Chạy server ở chế độ phát triển:
-   npm run start:dev
-
-### Khởi chạy Frontend
-1. Di chuyển vào thư mục frontend:
-   cd frontend
-2. Cài đặt các gói phụ thuộc:
-   npm install
-3. Chạy ứng dụng ở chế độ phát triển:
-   npm run dev
+### 4. Phân hệ Quản trị (Admin)
+* Dashboard thống kê tổng quan.
+* Quản lý nhân viên: Tạo mới, cập nhật thông tin nhân viên.
+* Quản lý bàn: Thêm, sửa, xóa bàn và thiết lập trạng thái.
+* Khởi tạo dữ liệu mẫu (Seed Module) cho hệ thống.
 
 ## Cấu trúc Thư mục
-- backend/: Chứa mã nguồn API NestJS.
-- frontend/: Chứa mã nguồn giao diện VueJS.
-- docs/: Chứa tài liệu phân tích thiết kế và nghiệp vụ.
 
-## Trạng thái Phát triển
-Hiện tại dự án đang trong giai đoạn phát triển Frontend và tích hợp các API cơ bản.
-- Đã hoàn thiện: UI Trang chủ, Xác thực (Popup Đăng nhập/Đăng ký/Quên mật khẩu/Đổi mật khẩu/Sửa hồ sơ).
-- Đang phát triển: Logic đặt bàn và kết nối Backend.
+### Backend (backend/src)
+* **auth/**: Xử lý đăng nhập, đăng ký, JWT strategy.
+* **common/**: Chứa các Decorator (Roles), DTO chung (Pagination), Guard.
+* **config/**: Cấu hình cơ sở dữ liệu.
+* **reservation-logs/**: Ghi lại lịch sử thay đổi trạng thái đặt bàn.
+* **reservations/**: Logic xử lý đặt bàn, bao gồm Gateway cho Socket.IO.
+* **roles/**: Định nghĩa thực thể vai trò người dùng.
+* **seed/**: Service để tạo dữ liệu ban đầu cho database.
+* **tables/**: Quản lý thông tin và trạng thái bàn.
+* **users/**: Quản lý người dùng và nhân viên.
+
+### Frontend (frontend/src)
+* **api/**: Các hàm gọi API (authApi, reservationApi, tableApi, adminApi).
+* **assets/**: Hình ảnh và tài nguyên tĩnh.
+* **components/**:
+  * **common/**: Các thành phần dùng chung (AppButton, AppTable, StatusBadge).
+  * **layout/**: Bố cục trang (Sidebar, AdminLayout, AppLayout).
+  * **map/**: Sơ đồ bàn (TableMap).
+  * **reservations/**: Form đặt bàn và danh sách đặt bàn.
+* **realtime/**: Cấu hình kết nối Socket.IO.
+* **store/**: Quản lý trạng thái ứng dụng (AuthStore, ReservationStore, TableStore).
+* **views/**: Các màn hình chính phân theo vai trò (Admin, Customer, Staff).
+
+## Hướng dẫn Cài đặt và Khởi chạy
+
+### Yêu cầu tiên quyết
+* Node.js (v18 trở lên)
+* PostgreSQL (đã cài đặt và đang chạy)
+
+### 1. Cài đặt Backend
+Di chuyển vào thư mục backend:
+```bash
+cd backend
+```
+Chạy lệnh sau để cài đặt các thư viện phụ thuộc:
+```bash
+npm install
+```
+Cấu hình biến môi trường
+```bash
+cp .env.example .env
+```
+Chạy server phát triển:
+```bash
+npm run start:dev
+```
+### 2. Cài đặt Frontend
+Di chuyển vào thư mục frontend:
+```bash
+cd frontend
+```
+Chạy lệnh sau để cài đặt các thư viện phụ thuộc:
+```bash
+npm install
+```
+Chạy ứng dụng frontend:
+```bash
+npm run dev
+```
+
+
