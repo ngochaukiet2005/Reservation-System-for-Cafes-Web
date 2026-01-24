@@ -57,7 +57,6 @@ Hệ thống được chia thành các module chức năng dựa trên vai trò 
 * **auth/**: Xử lý đăng nhập, đăng ký, JWT strategy.
 * **common/**: Chứa các Decorator (Roles), DTO chung (Pagination), Guard.
 * **config/**: Cấu hình cơ sở dữ liệu.
-* **reservation-logs/**: Ghi lại lịch sử thay đổi trạng thái đặt bàn.
 * **reservations/**: Logic xử lý đặt bàn, bao gồm Gateway cho Socket.IO.
 * **roles/**: Định nghĩa thực thể vai trò người dùng.
 * **seed/**: Service để tạo dữ liệu ban đầu cho database.
@@ -91,10 +90,6 @@ Chạy lệnh sau để cài đặt các thư viện phụ thuộc:
 ```bash
 npm install
 ```
-Cấu hình biến môi trường
-```bash
-cp .env.example .env
-```
 Chạy server phát triển:
 ```bash
 npm run start:dev
@@ -112,5 +107,4 @@ Chạy ứng dụng frontend:
 ```bash
 npm run dev
 ```
-
 
