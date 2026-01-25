@@ -86,6 +86,10 @@ Di chuyển vào thư mục backend:
 ```bash
 cd backend
 ```
+Tạo file `.env` dựa trên mẫu `.env.example` và cấu hình các biến môi trường cần thiết (ví dụ: kết nối cơ sở dữ liệu).
+``` bash
+copy .env.example .env
+```
 Chạy lệnh sau để cài đặt các thư viện phụ thuộc:
 ```bash
 npm install
