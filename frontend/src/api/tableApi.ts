@@ -31,6 +31,13 @@ export interface UpdateTablePayload {
   type?: string;
 }
 
+export interface FilterAvailableTablesPayload {
+  date: string; // Format: YYYY-MM-DD
+  start_time: string; // Format: HH:mm
+  end_time: string; // Format: HH:mm
+  capacity: number; // Number of guests
+}
+
 export const tableApi = {
   getAll: async () => {
     const response = await httpClient.get<{ message: string; data: Table[] }>('/tables');
@@ -44,6 +51,19 @@ export const tableApi = {
 
   getOne: async (id: number) => {
     const response = await httpClient.get<{ message: string; data: Table }>(`/tables/${id}`);
+    return response.data.data;
+  },
+
+  // Lọc bàn trống theo ngày, giờ và sức chứa
+  getAvailableTables: async (payload: FilterAvailableTablesPayload) => {
+    const response = await httpClient.get<{ message: string; data: Table[] }>('/tables/available', {
+      params: {
+        date: payload.date,
+        start_time: payload.start_time,
+        end_time: payload.end_time,
+        capacity: payload.capacity,
+      },
+    });
     return response.data.data;
   },
 

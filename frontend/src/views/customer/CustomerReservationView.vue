@@ -131,8 +131,9 @@ import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { reservationStore, type Table } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
-import TableMap from '../../components/map/TableMap.vue'; // IMPORT
+import TableMap from '../../components/map/TableMap.vue';
 import { getSocket } from '../../realtime/socket';
+import { tableApi } from '../../api/tableApi';
 
 const router = useRouter();
 const today = new Date().toISOString().split('T')[0];
@@ -222,7 +223,31 @@ const handleHourChange = () => {
 
 const loadTables = async () => {
   selectedTable.value = null;
-  await reservationStore.fetchTablesByTime(filter.date, formatTimeDisplay.value);
+  try {
+    // Gọi API lọc bàn trống theo ngày, giờ, sức chứa
+    const availableTables = await tableApi.getAvailableTables({
+      date: filter.date,
+      start_time: formatTimeDisplay.value,
+      end_time: calculateEndTime(formatTimeDisplay.value),
+      capacity: filter.people
+    });
+    
+    // Cập nhật bàn từ kết quả lọc
+    reservationStore.tables = availableTables.map((table: any) => ({
+      ...table,
+      status: 'AVAILABLE'
+    }));
+  } catch (error) {
+    console.error('Lỗi khi lọc bàn:', error);
+    alert('Không thể tải danh sách bàn. Vui lòng thử lại.');
+  }
+};
+
+const calculateEndTime = (startTime: string): string => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const endDate = new Date();
+  endDate.setHours(hours + 1, minutes, 0, 0);
+  return `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
 };
 
 const selectTable = (table: Table) => {
