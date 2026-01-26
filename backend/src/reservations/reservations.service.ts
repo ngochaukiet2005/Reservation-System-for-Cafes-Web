@@ -142,7 +142,10 @@ export class ReservationsService {
     if (!table) return;
 
     // Nếu bàn đang MAINTENANCE/DISABLED, không tự động thay đổi
-    if (table.status?.name === "MAINTENANCE" || table.status?.name === "DISABLED") {
+    if (
+      table.status?.name === "MAINTENANCE" ||
+      table.status?.name === "DISABLED"
+    ) {
       return;
     }
 
@@ -193,6 +196,13 @@ export class ReservationsService {
   }
 
   async create(dto: any, userId: string): Promise<Reservation> {
+    // Validate table_id
+    if (!dto.table_id) {
+      throw new BadRequestException(
+        "table_id is required. Please select a table.",
+      );
+    }
+
     // Lấy status PENDING
     const pendingStatus = await this.statusRepo.findOne({
       where: { name: "PENDING" },
@@ -204,26 +214,24 @@ export class ReservationsService {
     const startTime = new Date(dto.reservation_time || dto.start_time);
     const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 giờ sau
 
-    // Kiểm tra bàn nếu có
-    if (dto.table_id) {
-      const table = await this.tableRepo.findOne({
-        where: { id: dto.table_id },
-      });
-      if (!table) {
-        throw new BadRequestException("Table not found");
-      }
+    // Kiểm tra bàn
+    const table = await this.tableRepo.findOne({
+      where: { id: dto.table_id },
+    });
+    if (!table) {
+      throw new BadRequestException("Table not found");
+    }
 
-      // Kiểm tra xung đột đặt bàn
-      const hasConflict = await this.checkTableConflict(
-        dto.table_id,
-        startTime,
-        endTime,
+    // Kiểm tra xung đột đặt bàn
+    const hasConflict = await this.checkTableConflict(
+      dto.table_id,
+      startTime,
+      endTime,
+    );
+    if (hasConflict) {
+      throw new BadRequestException(
+        "Bàn này đã được đặt trong khung giờ này. Vui lòng chọn bàn khác hoặc thời gian khác.",
       );
-      if (hasConflict) {
-        throw new BadRequestException(
-          "Bàn này đã được đặt trong khung giờ này. Vui lòng chọn bàn khác hoặc thời gian khác.",
-        );
-      }
     }
 
     // Kiểm tra khách hàng
@@ -246,12 +254,12 @@ export class ReservationsService {
     });
 
     const savedReservation = await this.reservationRepo.save(reservation);
-    
+
     // Cập nhật table status
     if (dto.table_id) {
       await this.updateTableStatus(dto.table_id, "PENDING");
     }
-    
+
     // Reload with relations để get đầy đủ data
     const reloaded = await this.reservationRepo.findOne({
       where: { id: savedReservation.id },
@@ -351,12 +359,12 @@ export class ReservationsService {
       where: { id },
       relations: ["table", "customer", "status"],
     });
-    
+
     // Cập nhật table status về AVAILABLE nếu cần
     if (reloaded?.table_id) {
       await this.updateTableStatus(reloaded.table_id, targetStatusName);
     }
-    
+
     this.reservationsGateway.emitReservation("reservation.cancelled", reloaded);
     console.log(`[CANCEL] Reloaded status: ${reloaded?.status?.name}`);
     return reloaded;
@@ -392,12 +400,12 @@ export class ReservationsService {
       where: { id },
       relations: ["table", "customer", "status"],
     });
-    
+
     // Cập nhật table status
     if (reloaded?.table_id) {
       await this.updateTableStatus(reloaded.table_id, "CONFIRMED");
     }
-    
+
     this.reservationsGateway.emitReservation("reservation.updated", reloaded);
     console.log(
       `[CONFIRM] Reloaded reservation status_id: ${reloaded?.status_id}, status name: ${reloaded?.status?.name}`,
@@ -434,12 +442,12 @@ export class ReservationsService {
       where: { id },
       relations: ["table", "customer", "status"],
     });
-    
+
     // Cập nhật table status
     if (reloaded?.table_id) {
       await this.updateTableStatus(reloaded.table_id, "OCCUPIED");
     }
-    
+
     this.reservationsGateway.emitReservation("reservation.updated", reloaded);
     console.log(`[CHECK-IN] Reloaded status: ${reloaded?.status?.name}`);
     return reloaded;
@@ -474,12 +482,12 @@ export class ReservationsService {
       where: { id },
       relations: ["table", "customer", "status"],
     });
-    
+
     // Cập nhật table status về AVAILABLE
     if (reloaded?.table_id) {
       await this.updateTableStatus(reloaded.table_id, "COMPLETED");
     }
-    
+
     this.reservationsGateway.emitReservation("reservation.updated", reloaded);
     console.log(`[CHECK-OUT] Reloaded status: ${reloaded?.status?.name}`);
     return reloaded;
@@ -514,12 +522,12 @@ export class ReservationsService {
       where: { id },
       relations: ["table", "customer", "status"],
     });
-    
+
     // Cập nhật table status về AVAILABLE
     if (reloaded?.table_id) {
       await this.updateTableStatus(reloaded.table_id, "CANCELLED");
     }
-    
+
     this.reservationsGateway.emitReservation("reservation.cancelled", reloaded);
     console.log(`[APPROVE-CANCEL] Reloaded status: ${reloaded?.status?.name}`);
     return reloaded;
@@ -553,12 +561,12 @@ export class ReservationsService {
       where: { id },
       relations: ["table", "customer", "status"],
     });
-    
+
     // Cập nhật table status về RESERVED
     if (reloaded?.table_id) {
       await this.updateTableStatus(reloaded.table_id, "CONFIRMED");
     }
-    
+
     this.reservationsGateway.emitReservation("reservation.updated", reloaded);
     console.log(`[REJECT-CANCEL] Reloaded status: ${reloaded?.status?.name}`);
     return reloaded;

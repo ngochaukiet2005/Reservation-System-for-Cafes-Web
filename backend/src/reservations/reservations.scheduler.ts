@@ -1,11 +1,11 @@
-import { Injectable, Logger, forwardRef, Inject } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, In, IsNull } from 'typeorm';
-import { Reservation } from './entities/reservation.entity';
-import { ReservationStatus } from './entities/reservation-status.entity';
-import { ReservationsGateway } from './reservations.gateway';
-import { ReservationsService } from './reservations.service';
+import { Injectable, Logger, forwardRef, Inject } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan, In, IsNull } from "typeorm";
+import { Reservation } from "./entities/reservation.entity";
+import { ReservationStatus } from "./entities/reservation-status.entity";
+import { ReservationsGateway } from "./reservations.gateway";
+import { ReservationsService } from "./reservations.service";
 
 @Injectable()
 export class ReservationsScheduler {
@@ -28,14 +28,16 @@ export class ReservationsScheduler {
   async handleExpiredReservations() {
     try {
       // Lấy status PENDING, CONFIRMED và EXPIRED
-      const [pendingStatus, confirmedStatus, expiredStatus] = await Promise.all([
-        this.statusRepo.findOne({ where: { name: 'PENDING' } }),
-        this.statusRepo.findOne({ where: { name: 'CONFIRMED' } }),
-        this.statusRepo.findOne({ where: { name: 'EXPIRED' } }),
-      ]);
+      const [pendingStatus, confirmedStatus, expiredStatus] = await Promise.all(
+        [
+          this.statusRepo.findOne({ where: { name: "PENDING" } }),
+          this.statusRepo.findOne({ where: { name: "CONFIRMED" } }),
+          this.statusRepo.findOne({ where: { name: "EXPIRED" } }),
+        ],
+      );
 
       if (!pendingStatus || !confirmedStatus || !expiredStatus) {
-        this.logger.warn('PENDING/CONFIRMED/EXPIRED status missing');
+        this.logger.warn("PENDING/CONFIRMED/EXPIRED status missing");
         return;
       }
 
@@ -47,7 +49,7 @@ export class ReservationsScheduler {
           expires_at: LessThan(now),
           check_in_time: IsNull(),
         },
-        relations: ['table', 'customer', 'status'],
+        relations: ["table", "customer", "status"],
       });
 
       if (expiredReservations.length === 0) {
@@ -62,9 +64,11 @@ export class ReservationsScheduler {
           status_id: expiredStatus.id,
           updated_at: new Date(),
         })
-        .where('status_id IN (:...statusIds)', { statusIds: [pendingStatus.id, confirmedStatus.id] })
-        .andWhere('expires_at < :now', { now })
-        .andWhere('check_in_time IS NULL')
+        .where("status_id IN (:...statusIds)", {
+          statusIds: [pendingStatus.id, confirmedStatus.id],
+        })
+        .andWhere("expires_at < :now", { now })
+        .andWhere("check_in_time IS NULL")
         .execute();
 
       if (updateResult.affected && updateResult.affected > 0) {
@@ -76,28 +80,25 @@ export class ReservationsScheduler {
         for (const reservation of expiredReservations) {
           const reloaded = await this.reservationRepo.findOne({
             where: { id: reservation.id },
-            relations: ['table', 'customer', 'status'],
+            relations: ["table", "customer", "status"],
           });
           if (reloaded) {
             this.reservationsGateway.emitReservation(
-              'reservation.expired',
+              "reservation.expired",
               reloaded,
             );
             // Cập nhật table status về AVAILABLE
             if (reloaded.table_id) {
               await this.reservationsService.updateTableStatus(
                 reloaded.table_id,
-                'EXPIRED',
+                "EXPIRED",
               );
             }
           }
         }
       }
     } catch (error) {
-      this.logger.error(
-        `[EXPIRE] Error handling expired reservations:`,
-        error,
-      );
+      this.logger.error(`[EXPIRE] Error handling expired reservations:`, error);
     }
   }
 }

@@ -18,44 +18,62 @@
         <div class="filter-item">
           <label>Giờ đến</label>
           <div class="time-group">
-             <select v-model="filter.hour" @change="handleHourChange">
-                <option v-for="h in availableHours" :key="h" :value="h">
-                    {{ h.toString().padStart(2, '0') }} giờ
-                </option>
-             </select>
+             <input 
+               type="text" 
+               readonly 
+               :value="formatTimeDisplay"
+               @click="toggleMinuteDropdown"
+               class="time-display-input"
+               placeholder="HH:mm"
+             />
              
-             <span class="colon">:</span>
-             
-             <div class="custom-minute-select">
-                <div class="cms-trigger" @click="toggleMinuteDropdown">
-                    <span>{{ filter.minute.toString().padStart(2, '0') }}</span>
-                    <span class="chevron" :class="{ rotate: showMinuteDropdown }">▼</span>
-                </div>
-                
-                <transition name="fade-slide">
-                    <div v-if="showMinuteDropdown" class="cms-dropdown">
-                        <div 
-                            v-for="m in availableMinutes" 
-                            :key="m" 
-                            class="cms-item" 
-                            :class="{ active: m === filter.minute }"
-                            @click="selectMinute(m)"
-                        >
-                            {{ m.toString().padStart(2, '0') }}
-                        </div>
-                        <div v-if="availableMinutes.length === 0" class="cms-empty">
-                            Hết giờ
-                        </div>
-                    </div>
-                </transition>
-             </div>
-
+             <transition name="fade-slide">
+               <div v-if="showMinuteDropdown" class="time-picker-dropdown">
+                 <!-- Hour Selector -->
+                 <div class="time-section">
+                   <label class="time-label">Giờ</label>
+                   <div class="time-scroll">
+                     <div 
+                       v-for="h in availableHours" 
+                       :key="h" 
+                       class="time-option" 
+                       :class="{ active: h === filter.hour }"
+                       @click="selectHour(h)"
+                     >
+                       {{ h.toString().padStart(2, '0') }}
+                     </div>
+                   </div>
+                 </div>
+                 
+                 <div class="time-divider">:</div>
+                 
+                 <!-- Minute Selector -->
+                 <div class="time-section">
+                   <label class="time-label">Phút</label>
+                   <div class="time-scroll">
+                     <div 
+                       v-for="m in availableMinutes" 
+                       :key="m" 
+                       class="time-option" 
+                       :class="{ active: m === filter.minute }"
+                       @click="selectMinute(m)"
+                     >
+                       {{ m.toString().padStart(2, '0') }}
+                     </div>
+                     <div v-if="availableMinutes.length === 0" class="time-empty">
+                       Hết giờ
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </transition>
           </div>
         </div>
 
         <div class="filter-item">
           <label>Số người</label>
           <select v-model="filter.people">
+            <option :value="0">Không có (Hiển thị tất cả)</option>
             <option :value="2">1-2 người</option>
             <option :value="4">3-4 người</option>
             <option :value="6">5+ người</option>
@@ -63,8 +81,12 @@
         </div>
         
         <div class="filter-item action-col">
-          <button class="btn-primary-action" @click="suggestTable">
-             CHỌN NHANH
+          <button class="btn-search" @click="loadTables(true)" :disabled="isSearching">
+            <span v-if="!isSearching">🔍 TÌM KIẾM</span>
+            <span v-else>⏳ Đang tìm...</span>
+          </button>
+          <button class="btn-quick-select" @click="suggestTableAfterSearch" :disabled="reservationStore.tables.length === 0 || isSearching">
+             ⚡ CHỌN NHANH
           </button>
         </div>
       </div>
@@ -131,15 +153,16 @@ import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { reservationStore, type Table } from '../../store/reservationStore';
 import ReservationForm from '../../components/reservations/ReservationForm.vue';
-import TableMap from '../../components/map/TableMap.vue'; // IMPORT
+import TableMap from '../../components/map/TableMap.vue';
 import { getSocket } from '../../realtime/socket';
+import { tableApi } from '../../api/tableApi';
 
 const router = useRouter();
 const today = new Date().toISOString().split('T')[0];
 const showForm = ref(false);
 const showSuccessModal = ref(false);
 const selectedTable = ref<Table | null>(null);
-
+const isSearching = ref(false);
 const showMinuteDropdown = ref(false);
 
 const OPEN_HOUR = 8;
@@ -149,7 +172,7 @@ const filter = reactive({
   date: today,
   hour: new Date().getHours(),
   minute: new Date().getMinutes(),
-  people: 2
+  people: 0
 });
 
 const currentSystemTime = reactive({
@@ -197,18 +220,44 @@ const toggleMinuteDropdown = () => {
     showMinuteDropdown.value = !showMinuteDropdown.value;
 };
 
+const selectHour = (h: number) => {
+    filter.hour = h;
+    // Kiểm tra minute có hợp lệ không sau khi đổi giờ
+    const validMinutes = availableMinutes.value;
+    if (validMinutes.length > 0 && !validMinutes.includes(filter.minute)) {
+        filter.minute = validMinutes[0];
+    }
+};
+
 const selectMinute = (m: number) => {
     filter.minute = m;
     showMinuteDropdown.value = false;
-    loadTables();
+};
+
+const suggestTableAfterSearch = () => {
+  let bestTable;
+  
+  if (filter.people === 0) {
+    // Không lọc - chọn bàn AVAILABLE đầu tiên
+    bestTable = reservationStore.tables.find(t => t.status === 'AVAILABLE');
+  } else {
+    // Lọc theo capacity - chọn bàn phù hợp nhỏ nhất
+    bestTable = reservationStore.tables.find(t => 
+      t.status === 'AVAILABLE' && t.capacity >= filter.people
+    );
+  }
+  
+  if (bestTable) {
+    selectedTable.value = bestTable;
+  } else {
+    alert("Không tìm thấy bàn phù hợp. Vui lòng tìm kiếm lại.");
+  }
 };
 
 const handleDateChange = () => {
   if (availableHours.value.length > 0) {
       filter.hour = availableHours.value[0];
       handleHourChange();
-  } else {
-      loadTables();
   }
 };
 
@@ -217,41 +266,105 @@ const handleHourChange = () => {
     if (validMinutes.length > 0 && !validMinutes.includes(filter.minute)) {
         filter.minute = validMinutes[0];
     }
-    loadTables();
 };
 
-const loadTables = async () => {
-  selectedTable.value = null;
-  await reservationStore.fetchTablesByTime(filter.date, formatTimeDisplay.value);
+const loadTables = async (manualTrigger = false) => {
+  // Chỉ reset selectedTable nếu user trigger manual (click TÌM KIẾM)
+  if (manualTrigger) {
+    selectedTable.value = null;
+  }
+  
+  isSearching.value = manualTrigger; // Chỉ show loading khi manual
+  
+  try {
+    if (filter.people === 0) {
+      // Hiển thị TẤT CẢ các bàn (không lọc theo capacity)
+      await reservationStore.fetchTablesByTime(filter.date, formatTimeDisplay.value);
+    } else {
+      // Lọc bàn trống theo ngày, giờ, sức chứa
+      // Gọi API với capacity = 1 để lấy tất cả bàn trống
+      const availableTables = await tableApi.getAvailableTables({
+        date: filter.date,
+        start_time: formatTimeDisplay.value,
+        end_time: calculateEndTime(formatTimeDisplay.value),
+        capacity: 1 // Lấy tất cả bàn trống
+      });
+      
+      // Lọc client-side theo range capacity
+      let filteredTables = availableTables;
+      if (filter.people === 2) {
+        // 1-2 người: chỉ lấy bàn capacity 1-2
+        filteredTables = availableTables.filter((table: any) => table.capacity >= 1 && table.capacity <= 2);
+      } else if (filter.people === 4) {
+        // 3-4 người: chỉ lấy bàn capacity 3-4
+        filteredTables = availableTables.filter((table: any) => table.capacity >= 3 && table.capacity <= 4);
+      } else if (filter.people === 6) {
+        // 5+ người: chỉ lấy bàn capacity >= 5
+        filteredTables = availableTables.filter((table: any) => table.capacity >= 5);
+      }
+      
+      // Cập nhật bàn từ kết quả lọc
+      reservationStore.tables = filteredTables.map((table: any) => ({
+        ...table,
+        status: 'AVAILABLE'
+      }));
+    }
+    
+    if (reservationStore.tables.length === 0) {
+      alert('Không tìm thấy bàn trong thời gian này. Vui lòng chọn thời gian khác.');
+    }
+  } catch (error) {
+    console.error('Lỗi khi lọc bàn:', error);
+    alert('Không thể tải danh sách bàn. Vui lòng thử lại.');
+    
+    // Validate selectedTable sau khi load - nếu bàn đã chọn không còn available thì clear
+    if (selectedTable.value && !manualTrigger) {
+      const stillAvailable = reservationStore.tables.find(
+        (t: any) => t.id === selectedTable.value?.id && t.status === 'AVAILABLE'
+      );
+      if (!stillAvailable) {
+        selectedTable.value = null;
+      }
+    }
+  } finally {
+    isSearching.value = false;
+  }
+};
+
+const calculateEndTime = (startTime: string): string => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const endDate = new Date();
+  endDate.setHours(hours + 1, minutes, 0, 0);
+  return `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
 };
 
 const selectTable = (table: Table) => {
   if (table.status === 'AVAILABLE') selectedTable.value = table;
 };
 
-const suggestTable = () => {
-  if (reservationStore.tables.length === 0) return;
-  const bestTable = reservationStore.tables.find(t => 
-    t.status === 'AVAILABLE' && t.capacity >= filter.people
-  );
-  if (bestTable) selectedTable.value = bestTable;
-  else alert("Không tìm thấy bàn phù hợp.");
-};
+const suggestTable = suggestTableAfterSearch;
 
 const handleBooking = async (formData: any) => {
   try {
+    // Validate selectedTable
+    if (!selectedTable.value || !selectedTable.value.id) {
+      alert('Vui lòng chọn bàn trước khi đặt chỗ!');
+      return;
+    }
+
     await reservationStore.createReservation({
       ...formData,
       reservation_time: `${filter.date}T${formatTimeDisplay.value}`,
-      people: filter.people,
-      tableId: selectedTable.value?.id,
-      tableName: selectedTable.value?.name,
+      people: filter.people || 2,
+      tableId: selectedTable.value.id,
+      tableName: selectedTable.value.name,
       isAdmin: false 
     });
     showForm.value = false;
     setTimeout(() => { showSuccessModal.value = true; }, 300);
   } catch (error) {
-    alert('Lỗi kết nối');
+    console.error('Error booking:', error);
+    alert('Lỗi kết nối hoặc thông tin không hợp lệ. Vui lòng thử lại.');
   }
 };
 
@@ -269,30 +382,50 @@ watch(availableHours, (newVal) => {
 
 onMounted(() => {
     const now = new Date();
-    if (now.getHours() >= CLOSE_HOUR) {
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    if (currentHour >= CLOSE_HOUR) {
+        // Sau giờ đóng cửa - chuyển sang ngày mai
         const tomorrow = new Date(now);
         tomorrow.setDate(tomorrow.getDate() + 1);
         filter.date = tomorrow.toISOString().split('T')[0];
         filter.hour = OPEN_HOUR;
         filter.minute = 0;
+    } else if (currentHour < OPEN_HOUR) {
+        // Trước giờ mở cửa - set giờ mở cửa
+        filter.hour = OPEN_HOUR;
+        filter.minute = 0;
     } else {
-        if (filter.minute < now.getMinutes()) {
-            filter.minute = now.getMinutes();
-        }
+        // Trong giờ hoạt động - set giờ hiện tại
+        filter.hour = currentHour;
+        filter.minute = currentMinute;
     }
-    loadTables();
-  if (!customerPollId) {
-    customerPollId = setInterval(() => {
-      loadTables();
-    }, 15000);
-  }
-  if (!customerSocket) {
-    customerSocket = getSocket();
-    const refresh = () => loadTables();
-    customerSocket.on('reservation.created', refresh);
-    customerSocket.on('reservation.updated', refresh);
-    customerSocket.on('reservation.cancelled', refresh);
-  }
+    
+    // Load bàn ngay lập tức khi mount
+    loadTables(true);
+    
+    // Cập nhật real-time theo định kỳ (30 giây) - chỉ khi không đang điền form
+    if (!customerPollId) {
+      customerPollId = setInterval(() => {
+        if (!showForm.value) {
+          loadTables(false); // Background refresh, không reset selected
+        }
+      }, 30000);
+    }
+    
+    // Listen socket events - chỉ refresh khi không đang điền form
+    if (!customerSocket) {
+      customerSocket = getSocket();
+      const refresh = () => {
+        if (!showForm.value) {
+          loadTables(false); // Background refresh
+        }
+      };
+      customerSocket.on('reservation.created', refresh);
+      customerSocket.on('reservation.updated', refresh);
+      customerSocket.on('reservation.cancelled', refresh);
+    }
 });
 
 onUnmounted(() => {
@@ -326,7 +459,7 @@ onUnmounted(() => {
 /* Filters */
 .filters { display: flex; gap: 20px; background: #fdfbf7; padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #eee; align-items: flex-end; }
 .filter-item { flex: 1; display: flex; flex-direction: column; }
-.filter-item.action-col { justify-content: flex-end; flex: 0.8; }
+.filter-item.action-col { justify-content: flex-end; flex: 2; display: flex; gap: 10px; align-items: flex-end; }
 .filter-item label { font-size: 0.8rem; font-weight: 700; color: #555; margin-bottom: 8px; text-transform: uppercase; }
 
 /* Inputs styling */
@@ -344,62 +477,149 @@ onUnmounted(() => {
 }
 .filter-item input:focus, .filter-item select:focus { border-color: #a67c52; }
 
-.time-group { display: flex; align-items: center; gap: 8px; }
-.time-group select { flex: 1; }
-.colon { font-weight: bold; }
+.time-group { 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+  position: relative;
+  width: 100%;
+}
 
-/* --- CUSTOM MINUTE SELECT CSS --- */
-.custom-minute-select {
-    position: relative;
-    width: 90px;
-    height: 42px;
+/* Time Display Input */
+.time-display-input {
+  width: 100%;
+  height: 42px;
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color 0.2s;
 }
-.cms-trigger {
-    height: 100%;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 0 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 0.95rem;
-    transition: border-color 0.2s;
-    box-sizing: border-box;
-}
-.cms-trigger:hover { border-color: #a67c52; }
-.chevron { font-size: 0.7rem; color: #888; transition: transform 0.2s; }
-.chevron.rotate { transform: rotate(180deg); }
+.time-display-input:hover { border-color: #a67c52; }
+.time-display-input:focus { border-color: #a67c52; outline: none; }
 
-.cms-dropdown {
-    position: absolute;
-    top: 105%;
-    left: 0;
-    width: 100%;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    z-index: 100;
-    max-height: 180px; 
-    overflow-y: auto;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+/* Time Picker Dropdown */
+.time-picker-dropdown {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  z-index: 200;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  display: flex;
+  gap: 0;
+  overflow: hidden;
 }
-.cms-item { padding: 10px; text-align: center; cursor: pointer; transition: 0.1s; font-size: 0.9rem; border-bottom: 1px solid #f9f9f9; }
-.cms-item:hover { background: #f5f5f5; color: #a67c52; }
-.cms-item.active { background: #e3f2fd; color: #1565c0; font-weight: bold; }
-.cms-empty { padding: 10px; text-align: center; color: #888; font-size: 0.8rem; }
-.cms-dropdown::-webkit-scrollbar { width: 6px; }
-.cms-dropdown::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-.cms-dropdown::-webkit-scrollbar-track { background: #f1f1f1; }
+
+.time-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.time-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #666;
+  text-align: center;
+  padding: 10px;
+  background: #f8f8f8;
+  border-bottom: 1px solid #eee;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.time-scroll {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 5px 0;
+}
+
+.time-option {
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #333;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.time-option:hover {
+  background: #f0f7ff;
+  color: #a67c52;
+}
+
+.time-option.active {
+  background: #a67c52;
+  color: white;
+  font-weight: 700;
+}
+
+.time-divider {
+  width: 1px;
+  background: #ddd;
+  align-self: stretch;
+  margin: 10px 0;
+}
+
+.time-empty {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.time-scroll::-webkit-scrollbar { width: 5px; }
+.time-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+.time-scroll::-webkit-scrollbar-track { background: #f8f8f8; }
 
 /* FIX: Overlay giảm z-index xuống 5 */
 .click-overlay { position: fixed; inset: 0; z-index: 5; cursor: default; }
 
 /* Buttons */
-.btn-primary-action { height: 42px; width: 100%; background: #2c3e50; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
-.btn-primary-action:hover { background: #34495e; transform: translateY(-1px); }
+.btn-search { 
+  height: 42px; 
+  flex: 1;
+  background: #a67c52; 
+  color: white; 
+  border: none; 
+  border-radius: 6px; 
+  font-weight: 700; 
+  cursor: pointer; 
+  transition: 0.2s; 
+  text-transform: uppercase; 
+  letter-spacing: 0.5px; 
+}
+.btn-search:hover:not(:disabled) { background: #c59d70; transform: translateY(-1px); }
+.btn-search:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
+
+.btn-quick-select { 
+  height: 42px; 
+  flex: 0.8;
+  background: #2c3e50; 
+  color: white; 
+  border: none; 
+  border-radius: 6px; 
+  font-weight: 700; 
+  cursor: pointer; 
+  transition: 0.2s; 
+  text-transform: uppercase; 
+  letter-spacing: 0.5px;
+  margin-left: 10px;
+}
+.btn-quick-select:hover:not(:disabled) { background: #34495e; transform: translateY(-1px); }
+.btn-quick-select:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
 
 /* UPDATE: LEGEND ĐỒNG BỘ */
 .legend { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; font-size: 0.9rem; flex-wrap: wrap; }

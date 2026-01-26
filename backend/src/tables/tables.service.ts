@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { CafeTable } from './entities/table.entity';
 import { TableStatus } from './entities/table-status.entity';
+import { Reservation } from '../reservations/entities/reservation.entity';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
+import { FilterAvailableTablesDto } from './dto/filter-available-tables.dto';
 
 @Injectable()
 export class TablesService {
@@ -84,10 +86,80 @@ export class TablesService {
 
   async remove(id: string): Promise<void> {
     const table = await this.findOne(id);
+    
+    // Kiểm tra xem bàn có đặt chỗ đang hoạt động không (PENDING, CONFIRMED, OCCUPIED)
+    const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
+    const activeReservations = await reservationRepo
+      .createQueryBuilder('r')
+      .innerJoin('r.status', 's')
+      .where('r.table_id = :tableId', { tableId: id })
+      .andWhere('s.name IN (:...activeStatuses)', { 
+        activeStatuses: ['PENDING', 'CONFIRMED', 'OCCUPIED'] 
+      })
+      .getCount();
+    
+    if (activeReservations > 0) {
+      throw new BadRequestException(
+        `Không thể xóa bàn "${table.name}" vì có ${activeReservations} đặt chỗ đang hoạt động. Vui lòng hủy hoặc hoàn thành các đặt chỗ trước.`
+      );
+    }
+    
+    // Xóa tất cả các đặt chỗ của bàn này (bất kể trạng thái) để tránh foreign key constraint
+    await reservationRepo.delete({ table_id: id });
+    
+    // Xóa bàn
     await this.tableRepo.remove(table);
   }
 
   async getStatuses(): Promise<TableStatus[]> {
     return this.statusRepo.find();
+  }
+
+  async findAvailableTables(filterDto: FilterAvailableTablesDto): Promise<CafeTable[]> {
+    // Parse input
+    const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
+    const date = new Date(filterDto.date);
+    const [startHour, startMin] = filterDto.start_time.split(':').map(Number);
+    const [endHour, endMin] = filterDto.end_time.split(':').map(Number);
+
+    // Create start_time and end_time for this date
+    const startDateTime = new Date(date);
+    startDateTime.setHours(startHour, startMin, 0, 0);
+
+    const endDateTime = new Date(date);
+    endDateTime.setHours(endHour, endMin, 0, 0);
+
+    // Get AVAILABLE status
+    const availableStatus = await this.statusRepo.findOne({ where: { name: 'AVAILABLE' } });
+    if (!availableStatus) {
+      throw new NotFoundException('AVAILABLE status not found');
+    }
+
+    // Get all tables that are AVAILABLE and have capacity >= requested capacity
+    const allTables = await this.tableRepo
+      .createQueryBuilder('t')
+      .leftJoinAndSelect('t.status', 'status')
+      .where('t.status_id = :statusId', { statusId: availableStatus.id })
+      .andWhere('t.capacity >= :capacity', { capacity: filterDto.capacity })
+      .orderBy('t.capacity', 'ASC')
+      .addOrderBy('t.sort_order', 'ASC')
+      .getMany();
+
+    // Filter out tables that have conflicting reservations
+    const conflictingTableIds = await reservationRepo
+      .createQueryBuilder('r')
+      .select('DISTINCT r.table_id')
+      .innerJoin('r.status', 's')
+      .where('r.start_time < :endDateTime', { endDateTime })
+      .andWhere('r.end_time > :startDateTime', { startDateTime })
+      .andWhere('s.name IN (:...activeStatuses)', {
+        activeStatuses: ['PENDING', 'CONFIRMED', 'OCCUPIED'],
+      })
+      .getRawMany();
+
+    const conflictingIds = new Set(conflictingTableIds.map((r) => r.table_id));
+
+    // Return tables that don't have conflicts
+    return allTables.filter((table) => !conflictingIds.has(table.id));
   }
 }
