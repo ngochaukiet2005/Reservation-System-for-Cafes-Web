@@ -106,7 +106,11 @@ export const reservationStore = reactive({
     this.isLoading = true;
     try {
       const data = await reservationApi.getReservations(params);
-      this.reservations = (Array.isArray(data) ? data : []).map(mapReservation);
+      // Force reactivity bằng cách tạo mảng mới hoàn toàn
+      const mapped = (Array.isArray(data) ? data : []).map(mapReservation);
+      // Clear array và push lại thay vì gán trực tiếp
+      this.reservations.splice(0, this.reservations.length);
+      this.reservations.push(...mapped);
     } finally {
       this.isLoading = false;
     }
@@ -144,16 +148,15 @@ export const reservationStore = reactive({
       console.log(`[FRONTEND] Received response:`, res);
       console.log(`[FRONTEND] Response status:`, res.status);
 
-      // Cập nhật trực tiếp reservation trong store
+      // Cập nhật trực tiếp reservation trong store bằng splice để force reactivity
       const index = this.reservations.findIndex((r) => r.id === id);
       if (index !== -1) {
         const mapped = mapReservation(res);
         console.log(`[FRONTEND] Mapped reservation status:`, mapped.status);
-        this.reservations[index] = mapped;
+        this.reservations.splice(index, 1, mapped);
       }
 
-      // Fetch lại để đồng bộ với server
-      await this.fetchReservations();
+      // Chỉ fetch tables, không fetch reservations (để giữ filter)
       await this.fetchTables();
       return res;
     } catch (error) {
@@ -168,13 +171,12 @@ export const reservationStore = reactive({
     this.isLoading = true;
     try {
       const res = await reservationApi.cancelReservation(id, reason);
-      // Cập nhật trực tiếp reservation trong store
+      // Cập nhật trực tiếp reservation trong store bằng splice
       const index = this.reservations.findIndex((r) => r.id === id);
       if (index !== -1) {
-        this.reservations[index] = mapReservation(res);
+        this.reservations.splice(index, 1, mapReservation(res));
       }
-      // Fetch lại để đồng bộ với server
-      await this.fetchReservations();
+      // Chỉ fetch tables, không fetch reservations (để giữ filter)
       await this.fetchTables();
       return res;
     } catch (error: any) {
@@ -194,13 +196,12 @@ export const reservationStore = reactive({
     this.isLoading = true;
     try {
       const res = await reservationApi.checkIn(id);
-      // Cập nhật trực tiếp reservation trong store
+      // Cập nhật trực tiếp reservation trong store bằng splice
       const index = this.reservations.findIndex((r) => r.id === id);
       if (index !== -1) {
-        this.reservations[index] = mapReservation(res);
+        this.reservations.splice(index, 1, mapReservation(res));
       }
-      // Fetch lại để đồng bộ với server
-      await this.fetchReservations();
+      // Chỉ fetch tables, không fetch reservations (để giữ filter)
       await this.fetchTables();
       return res;
     } finally {
@@ -212,13 +213,12 @@ export const reservationStore = reactive({
     this.isLoading = true;
     try {
       const res = await reservationApi.checkOut(id);
-      // Cập nhật trực tiếp reservation trong store
+      // Cập nhật trực tiếp reservation trong store bằng splice
       const index = this.reservations.findIndex((r) => r.id === id);
       if (index !== -1) {
-        this.reservations[index] = mapReservation(res);
+        this.reservations.splice(index, 1, mapReservation(res));
       }
-      // Fetch lại để đồng bộ với server
-      await this.fetchReservations();
+      // Chỉ fetch tables, không fetch reservations (để giữ filter)
       await this.fetchTables();
       return res;
     } finally {
@@ -230,13 +230,12 @@ export const reservationStore = reactive({
     this.isLoading = true;
     try {
       const res = await reservationApi.approveCancelRequest(id);
-      // Cập nhật trực tiếp reservation trong store
+      // Cập nhật trực tiếp reservation trong store bằng splice
       const index = this.reservations.findIndex((r) => r.id === id);
       if (index !== -1) {
-        this.reservations[index] = mapReservation(res);
+        this.reservations.splice(index, 1, mapReservation(res));
       }
-      // Fetch lại để đồng bộ với server
-      await this.fetchReservations();
+      // Chỉ fetch tables, không fetch reservations (để giữ filter)
       await this.fetchTables();
       return res;
     } finally {
@@ -248,13 +247,12 @@ export const reservationStore = reactive({
     this.isLoading = true;
     try {
       const res = await reservationApi.rejectCancelRequest(id, reason);
-      // Cập nhật trực tiếp reservation trong store
+      // Cập nhật trực tiếp reservation trong store bằng splice
       const index = this.reservations.findIndex((r) => r.id === id);
       if (index !== -1) {
-        this.reservations[index] = mapReservation(res);
+        this.reservations.splice(index, 1, mapReservation(res));
       }
-      // Fetch lại để đồng bộ với server
-      await this.fetchReservations();
+      // Chỉ fetch tables, không fetch reservations (để giữ filter)
       await this.fetchTables();
       return res;
     } finally {
