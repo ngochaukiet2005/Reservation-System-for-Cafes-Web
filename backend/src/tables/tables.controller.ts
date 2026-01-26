@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { TablesService } from './tables.service';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
@@ -41,6 +41,13 @@ export class TablesController {
   @Put(':id')
   @Roles('ADMIN')
   async update(@Param('id') id: string, @Body() dto: UpdateTableDto) {
+    const table = await this.tablesService.update(id, dto);
+    return { message: 'Table updated successfully', data: table };
+  }
+
+  @Patch(':id')
+  @Roles('ADMIN', 'STAFF')
+  async patch(@Param('id') id: string, @Body() dto: Partial<UpdateTableDto>) {
     const table = await this.tablesService.update(id, dto);
     return { message: 'Table updated successfully', data: table };
   }

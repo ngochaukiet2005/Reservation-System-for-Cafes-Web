@@ -8,6 +8,7 @@ import { Repository, Between } from "typeorm";
 import { Reservation } from "./entities/reservation.entity";
 import { ReservationStatus } from "./entities/reservation-status.entity";
 import { CafeTable } from "../tables/entities/table.entity";
+import { TableStatus } from "../tables/entities/table-status.entity";
 import { User } from "../users/entities/user.entity";
 import { ReservationsGateway } from "./reservations.gateway";
 
@@ -23,6 +24,8 @@ export class ReservationsService {
     private readonly statusRepo: Repository<ReservationStatus>,
     @InjectRepository(CafeTable)
     private readonly tableRepo: Repository<CafeTable>,
+    @InjectRepository(TableStatus)
+    private readonly tableStatusRepo: Repository<TableStatus>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly reservationsGateway: ReservationsGateway,
