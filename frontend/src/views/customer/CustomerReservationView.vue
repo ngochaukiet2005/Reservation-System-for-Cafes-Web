@@ -277,14 +277,14 @@ const loadTables = async (manualTrigger = false) => {
   isSearching.value = manualTrigger; // Chỉ show loading khi manual
   
   try {
-    // Luôn lấy TẤT CẢ bàn với status thực tế từ backend (không chỉ AVAILABLE)
-    const allTables = await reservationStore.fetchTables();
+    // Fetch tables với status tính cho ngày/giờ mà user chọn
+    // formatTimeDisplay is a computed ref → use its value
+    const allTables = await reservationStore.fetchTablesByTime(filter.date, formatTimeDisplay.value);
     
-    // Filter client-side theo ngày, giờ và sức chứa
+    // Filter client-side theo sức chứa
     if (filter.people === 0) {
       // Hiển thị TẤT CẢ các bàn (không lọc theo capacity)
       // Nhưng vẫn lọc theo status: chỉ show AVAILABLE, PENDING, RESERVED
-      // Lý do: PENDING = chờ duyệt (khách hàng cần thấy), RESERVED = đã đặt (khách hàng cần thấy)
       reservationStore.tables = allTables.filter((table: any) => 
         ['AVAILABLE', 'PENDING', 'RESERVED'].includes(table.status)
       );

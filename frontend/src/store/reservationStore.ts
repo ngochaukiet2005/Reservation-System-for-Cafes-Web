@@ -91,11 +91,11 @@ export const reservationStore = reactive({
   },
 
   async fetchTablesByTime(date: string, time: string) {
-    // Backend đã tự động cập nhật table status theo reservations real-time
-    // Nên chỉ cần fetch tables trực tiếp từ backend mà không tính lại client-side
+    // Fetch tables với status tính toán cho thời gian cụ thể
     this.isLoading = true;
     try {
-      await this.fetchTables();
+      const data = await tableApi.getTablesByDateTime(date, time);
+      this.tables = data.map(mapTable);
     } finally {
       this.isLoading = false;
     }
