@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, forwardRef, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, In, IsNull } from 'typeorm';
 import { Reservation } from './entities/reservation.entity';
 import { ReservationStatus } from './entities/reservation-status.entity';
 import { ReservationsGateway } from './reservations.gateway';
+import { ReservationsService } from './reservations.service';
 
 @Injectable()
 export class ReservationsScheduler {
@@ -16,6 +17,8 @@ export class ReservationsScheduler {
     @InjectRepository(ReservationStatus)
     private readonly statusRepo: Repository<ReservationStatus>,
     private readonly reservationsGateway: ReservationsGateway,
+    @Inject(forwardRef(() => ReservationsService))
+    private readonly reservationsService: ReservationsService,
   ) {}
 
   /**
@@ -66,10 +69,10 @@ export class ReservationsScheduler {
 
       if (updateResult.affected && updateResult.affected > 0) {
         this.logger.log(
-          `[EXPIRE] Expired ${updateResult.affected} PENDING reservation(s)`,
+          `[EXPIRE] Expired ${updateResult.affected} PENDING/CONFIRMED reservation(s)`,
         );
 
-        // Reload và emit cho frontend
+        // Reload và emit cho frontend + cập nhật table status
         for (const reservation of expiredReservations) {
           const reloaded = await this.reservationRepo.findOne({
             where: { id: reservation.id },
@@ -80,6 +83,13 @@ export class ReservationsScheduler {
               'reservation.expired',
               reloaded,
             );
+            // Cập nhật table status về AVAILABLE
+            if (reloaded.table_id) {
+              await this.reservationsService.updateTableStatus(
+                reloaded.table_id,
+                'EXPIRED',
+              );
+            }
           }
         }
       }
