@@ -360,14 +360,13 @@ let adminSocket: any = null;
 onMounted(() => {
   loadTables();
   loadStatuses();
-  if (!adminSocket) {
-    adminSocket = getSocket();
-    const refreshLive = () => loadLiveTableStatus();
-    adminSocket.on('reservation.created', refreshLive);
-    adminSocket.on('reservation.updated', refreshLive);
-    adminSocket.on('reservation.cancelled', refreshLive);
-    adminSocket.on('table.updated', refreshLive);
-  }
+  // Luôn setup lại listeners mỗi lần mount để đảm bảo nhận events
+  adminSocket = getSocket();
+  const refreshLive = () => loadLiveTableStatus();
+  adminSocket.on('reservation.created', refreshLive);
+  adminSocket.on('reservation.updated', refreshLive);
+  adminSocket.on('reservation.cancelled', refreshLive);
+  adminSocket.on('table.updated', refreshLive);
   // Auto-sync Admin view with live reservations every 10s
   if (!adminPollId) {
     adminPollId = setInterval(() => {

@@ -34,24 +34,30 @@ export const useTableStore = defineStore('table', () => {
   const initRealTimeListener = () => {
     const socket = getSocket();
     
-    // Khi reservation created/updated/cancelled/expired → cập nhật lại tables
+    // Khi BẤT CỨ ai đặt/hủy/cập nhật reservation → TẤT CẢ khách hàng cập nhật lại tables
     socket.on('reservation.created', () => {
-      console.log('[tableStore] Reservation created, refetching tables');
+      console.log('[tableStore] Reservation created by someone, refetching tables for all users');
       fetchTables();
     });
     
     socket.on('reservation.updated', () => {
-      console.log('[tableStore] Reservation updated, refetching tables');
+      console.log('[tableStore] Reservation updated, refetching tables for all users');
       fetchTables();
     });
     
     socket.on('reservation.cancelled', () => {
-      console.log('[tableStore] Reservation cancelled, refetching tables');
+      console.log('[tableStore] Reservation cancelled, refetching tables for all users');
       fetchTables();
     });
     
     socket.on('reservation.expired', () => {
-      console.log('[tableStore] Reservation expired, refetching tables');
+      console.log('[tableStore] Reservation expired, refetching tables for all users');
+      fetchTables();
+    });
+
+    // Cũng listen trực tiếp table.updated event nếu có
+    socket.on('table.updated', (data: any) => {
+      console.log('[tableStore] Table updated directly:', data);
       fetchTables();
     });
   };

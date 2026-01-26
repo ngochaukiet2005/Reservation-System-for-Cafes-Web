@@ -415,17 +415,16 @@ onMounted(() => {
     }
     
     // Listen socket events - chỉ refresh khi không đang điền form
-    if (!customerSocket) {
-      customerSocket = getSocket();
-      const refresh = () => {
-        if (!showForm.value) {
-          loadTables(false); // Background refresh
-        }
-      };
-      customerSocket.on('reservation.created', refresh);
-      customerSocket.on('reservation.updated', refresh);
-      customerSocket.on('reservation.cancelled', refresh);
-    }
+    // Luôn setup lại listeners mỗi lần mount để đảm bảo nhận events
+    customerSocket = getSocket();
+    const refresh = () => {
+      if (!showForm.value) {
+        loadTables(false); // Background refresh
+      }
+    };
+    customerSocket.on('reservation.created', refresh);
+    customerSocket.on('reservation.updated', refresh);
+    customerSocket.on('reservation.cancelled', refresh);
 });
 
 onUnmounted(() => {

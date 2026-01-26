@@ -17,8 +17,67 @@ export class TablesService {
     private readonly statusRepo: Repository<TableStatus>,
   ) {}
 
-  async findAll(): Promise<CafeTable[]> {
-    return this.tableRepo.find({ relations: ['status'], order: { sort_order: 'ASC', id: 'ASC' } });
+  async findAll(): Promise<any[]> {
+    // Lấy tất cả bàn cùng status hiện tại
+    const tables = await this.tableRepo.find({ 
+      relations: ['status'], 
+      order: { sort_order: 'ASC', id: 'ASC' } 
+    });
+
+    // Lấy tất cả reservation ACTIVE trong tương lai để kiểm tra bàn nào đang được đặt
+    const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
+    const now = new Date();
+    
+    const activeReservations = await reservationRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.status', 's')
+      .where('r.end_time > :now', { now })
+      .andWhere('s.name IN (:...activeStatuses)', {
+        activeStatuses: ['PENDING', 'CONFIRMED', 'OCCUPIED'],
+      })
+      .getMany();
+
+    // Tạo map: table_id -> reservation để lookup nhanh
+    const reservedTableMap = new Map<string, Reservation>();
+    activeReservations.forEach(res => {
+      if (!reservedTableMap.has(res.table_id)) {
+        reservedTableMap.set(res.table_id, res);
+      }
+    });
+
+    // Cập nhật trạng thái bàn dựa trên reservation
+    return tables.map(table => {
+      const hasActiveReservation = reservedTableMap.has(table.id);
+      
+      // Nếu bàn đang MAINTENANCE/DISABLED → giữ nguyên
+      if (table.status?.name === 'MAINTENANCE' || table.status?.name === 'DISABLED') {
+        return table;
+      }
+
+      // Nếu có active reservation → trả về status RESERVED/OCCUPIED
+      if (hasActiveReservation) {
+        const reservation = reservedTableMap.get(table.id)!;
+        // Override status dựa trên reservation status
+        return {
+          ...table,
+          status: {
+            ...table.status,
+            name: reservation.status?.name === 'OCCUPIED' ? 'OCCUPIED' : 'RESERVED'
+          },
+          _display_status: reservation.status?.name === 'OCCUPIED' ? 'OCCUPIED' : 'RESERVED'
+        };
+      }
+
+      // Nếu không có active reservation → AVAILABLE
+      return {
+        ...table,
+        status: {
+          ...table.status,
+          name: 'AVAILABLE'
+        },
+        _display_status: 'AVAILABLE'
+      };
+    });
   }
 
   async findOne(id: string): Promise<CafeTable> {

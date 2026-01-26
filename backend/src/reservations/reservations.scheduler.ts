@@ -41,11 +41,12 @@ export class ReservationsScheduler {
         return;
       }
 
-      // Tìm reservation tới giờ mà khách chưa check-in
+      // Tìm CONFIRMED reservation tới giờ mà khách chưa check-in
+      // PENDING không bị expire tự động (chỉ nhân viên hủy thủ công)
       const now = new Date();
       const expiredReservations = await this.reservationRepo.find({
         where: {
-          status_id: In([pendingStatus.id, confirmedStatus.id]),
+          status_id: confirmedStatus.id,
           expires_at: LessThan(now),
           check_in_time: IsNull(),
         },
@@ -56,7 +57,7 @@ export class ReservationsScheduler {
         return; // Không có gì để expire
       }
 
-      // Cập nhật trạng thái thành EXPIRED
+      // Cập nhật CONFIRMED reservation thành EXPIRED
       const updateResult = await this.reservationRepo
         .createQueryBuilder()
         .update(Reservation)
@@ -64,8 +65,8 @@ export class ReservationsScheduler {
           status_id: expiredStatus.id,
           updated_at: new Date(),
         })
-        .where("status_id IN (:...statusIds)", {
-          statusIds: [pendingStatus.id, confirmedStatus.id],
+        .where("status_id = :statusId", {
+          statusId: confirmedStatus.id,
         })
         .andWhere("expires_at < :now", { now })
         .andWhere("check_in_time IS NULL")

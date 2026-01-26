@@ -650,7 +650,7 @@ const refreshReservations = () => {
 onMounted(() => { 
     refreshReservations(); 
     resetToNow();
-  if (!staffSocket) {
+    // Luôn setup lại listeners mỗi lần mount để đảm bảo nhận events
     staffSocket = getSocket();
     const refresh = () => { 
         refreshReservations(); 
@@ -659,7 +659,6 @@ onMounted(() => {
     staffSocket.on('reservation.created', refresh);
     staffSocket.on('reservation.updated', refresh);
     staffSocket.on('reservation.cancelled', refresh);
-  }
     if (!staffPollId) {
         staffPollId = setInterval(() => {
             refreshReservations();
