@@ -36,6 +36,41 @@ export class TablesController {
     return { message: "Table statuses retrieved successfully", data: statuses };
   }
 
+  @Get("by-datetime")
+  async findTablesByDateTime(@Query() query: any) {
+    try {
+      const { date, time } = query;
+        console.log('[TABLES] by-datetime endpoint called with query:', { date, time, fullQuery: query });
+      
+      if (!date || !time) {
+        throw new BadRequestException(
+          "Missing required fields: date (YYYY-MM-DD), time (HH:mm)"
+        );
+      }
+
+      // Validate date format (YYYY-MM-DD)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw new BadRequestException("Invalid date format. Use YYYY-MM-DD");
+      }
+
+      // Validate time format (HH:mm)
+      if (!/^\d{2}:\d{2}$/.test(time)) {
+        throw new BadRequestException("Invalid time format. Use HH:mm");
+      }
+
+      const tables = await this.tablesService.findAllByDateTime(date, time);
+      return {
+        message: "Tables with status at specified date/time retrieved successfully",
+        data: tables,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Error retrieving tables: ${error.message}`);
+    }
+  }
+
   @Get("available")
   async findAvailableTables(@Query() query: any) {
     try {

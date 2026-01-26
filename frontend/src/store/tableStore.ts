@@ -1,24 +1,24 @@
 // src/store/tableStore.ts
-import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import { getSocket } from '../realtime/socket';
+import { defineStore } from "pinia";
+import { ref } from "vue";
+import { getSocket } from "../realtime/socket";
 
 export interface Table {
   id: string;
   name: string;
   seats: number;
-  status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'DISABLED' | 'PENDING';
+  status: "AVAILABLE" | "RESERVED" | "OCCUPIED" | "DISABLED" | "PENDING";
 }
 
-export const useTableStore = defineStore('table', () => {
+export const useTableStore = defineStore("table", () => {
   const tables = ref<Table[]>([]);
 
   // Fetch tables từ API
   const fetchTables = async () => {
     try {
-      const response = await fetch('http://localhost:3000/tables', {
+      const response = await fetch("http://localhost:3000/tables", {
         headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('auth_token')}`,
+          Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
         },
       });
       if (response.ok) {
@@ -26,17 +26,17 @@ export const useTableStore = defineStore('table', () => {
         tables.value = data.data || [];
       }
     } catch (error) {
-      console.error('[tableStore] Error fetching tables:', error);
+      console.error("[tableStore] Error fetching tables:", error);
     }
   };
 
   // Listen socket để cập nhật table khi reservation thay đổi
   const initRealTimeListener = () => {
     const socket = getSocket();
-    
+
     // Khi table.updated → cập nhật table cụ thể; nếu không tìm thấy thì refetch toàn bộ
-    socket.on('table.updated', (updatedTable: any) => {
-      console.log('[tableStore] Table updated:', updatedTable);
+    socket.on("table.updated", (updatedTable: any) => {
+      console.log("[tableStore] Table updated:", updatedTable);
       if (updatedTable && updatedTable.id) {
         const index = tables.value.findIndex((t) => t.id === updatedTable.id);
         if (index !== -1) {
@@ -44,9 +44,11 @@ export const useTableStore = defineStore('table', () => {
             id: updatedTable.id,
             name: updatedTable.name,
             seats: updatedTable.capacity,
-            status: updatedTable.status?.name || 'AVAILABLE',
+            status: updatedTable.status?.name || "AVAILABLE",
           };
-          console.log(`[tableStore] Updated table ${updatedTable.id} to status ${updatedTable.status?.name}`);
+          console.log(
+            `[tableStore] Updated table ${updatedTable.id} to status ${updatedTable.status?.name}`,
+          );
           return;
         }
       }
@@ -54,35 +56,42 @@ export const useTableStore = defineStore('table', () => {
     });
 
     // Khi reservation created/updated/cancelled/expired → cập nhật lại tables
-    socket.on('reservation.created', () => {
-      console.log('[tableStore] Reservation created by someone, refetching tables for all users');
-      fetchTables();
-    });
-    
-    socket.on('reservation.updated', () => {
-      console.log('[tableStore] Reservation updated, refetching tables for all users');
-      fetchTables();
-    });
-    
-    socket.on('reservation.cancelled', () => {
-      console.log('[tableStore] Reservation cancelled, refetching tables for all users');
-      fetchTables();
-    });
-    
-    socket.on('reservation.expired', () => {
-      console.log('[tableStore] Reservation expired, refetching tables for all users');
+    socket.on("reservation.created", () => {
+      console.log(
+        "[tableStore] Reservation created by someone, refetching tables for all users",
+      );
       fetchTables();
     });
 
+    socket.on("reservation.updated", () => {
+      console.log(
+        "[tableStore] Reservation updated, refetching tables for all users",
+      );
+      fetchTables();
+    });
+
+    socket.on("reservation.cancelled", () => {
+      console.log(
+        "[tableStore] Reservation cancelled, refetching tables for all users",
+      );
+      fetchTables();
+    });
+
+    socket.on("reservation.expired", () => {
+      console.log(
+        "[tableStore] Reservation expired, refetching tables for all users",
+      );
+      fetchTables();
+    });
   };
 
-  const addTable = async (newTable: Omit<Table, 'id' | 'status'>) => {
+  const addTable = async (newTable: Omit<Table, "id" | "status">) => {
     try {
-      const response = await fetch('http://localhost:3000/tables', {
-        method: 'POST',
+      const response = await fetch("http://localhost:3000/tables", {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(newTable),
       });
@@ -90,17 +99,17 @@ export const useTableStore = defineStore('table', () => {
         await fetchTables();
       }
     } catch (error) {
-      console.error('[tableStore] Error adding table:', error);
+      console.error("[tableStore] Error adding table:", error);
     }
   };
 
   const updateTable = async (id: string, updates: Partial<Table>) => {
     try {
       const response = await fetch(`http://localhost:3000/tables/${id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(updates),
       });
@@ -108,32 +117,32 @@ export const useTableStore = defineStore('table', () => {
         await fetchTables();
       }
     } catch (error) {
-      console.error('[tableStore] Error updating table:', error);
+      console.error("[tableStore] Error updating table:", error);
     }
   };
 
   const deleteTable = async (id: string) => {
     try {
       const response = await fetch(`http://localhost:3000/tables/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('auth_token')}`,
+          Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
         },
       });
       if (response.ok) {
         await fetchTables();
       }
     } catch (error) {
-      console.error('[tableStore] Error deleting table:', error);
+      console.error("[tableStore] Error deleting table:", error);
     }
   };
 
-  return { 
-    tables, 
+  return {
+    tables,
     fetchTables,
-    initRealTimeListener, 
-    addTable, 
-    updateTable, 
-    deleteTable 
+    initRealTimeListener,
+    addTable,
+    updateTable,
+    deleteTable,
   };
 });
