@@ -353,22 +353,18 @@ const switchToMapForCreate = () => {
 // Computed Filtered List
 const filteredReservations = computed(() => {
   let data = [...reservationStore.reservations]; // Tạo bản copy mới
-  console.log('[STAFF] Computing filtered reservations. Total:', data.length);
 
   if (filterStatus.value !== 'ALL') {
     if (filterStatus.value === 'HISTORY') data = data.filter(r => ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(r.status));
     else data = data.filter(r => r.status === filterStatus.value);
-    console.log('[STAFF] After status filter:', data.length);
   }
 
   if (searchKeyword.value) {
     const k = searchKeyword.value.toLowerCase();
     data = data.filter(r => r.guestName.toLowerCase().includes(k) || r.phone.includes(k));
-    console.log('[STAFF] After search filter:', data.length);
   }
 
   if (listFilter.date || listFilter.hour !== '' || listFilter.minute !== '') {
-      console.log('[STAFF] Applying date/time filter:', listFilter);
       data = data.filter(r => {
           const rDate = new Date(r.time);
           if (listFilter.date) {
@@ -383,12 +379,9 @@ const filteredReservations = computed(() => {
           }
           return true;
       });
-      console.log('[STAFF] After date/time filter:', data.length);
   }
 
-  const sorted = data.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-  console.log('[STAFF] Final filtered count:', sorted.length);
-  return sorted;
+  return data.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 });
 
 const handleApprove = async (item: any) => { 
@@ -627,8 +620,14 @@ const todayString = computed(() => new Date().toLocaleDateString('vi-VN'));
 const getCountByStatus = (status: string) => status==='HISTORY' ? reservationStore.reservations.filter(r=>['COMPLETED','CANCELLED', 'NO_SHOW'].includes(r.status)).length : reservationStore.reservations.filter(r=>r.status===status).length;
 const getStatusLabel = (s:string) => ({PENDING:'Chờ duyệt',CONFIRMED:'Sắp đến',OCCUPIED:'Đang có khách',COMPLETED:'Xong',CANCELLED:'Hủy', REQUEST_CANCEL: 'Yêu cầu hủy'}[s]||s);
 const getStatusLabelMap = (s: string) => ({ AVAILABLE: 'Trống', PENDING: 'Chờ duyệt', RESERVED: 'Có khách đặt', OCCUPIED: 'Đang có khách', MAINTENANCE: 'Bảo trì' }[s] || s);
-const formatTimeOnly = (iso: string) => new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-const formatDateOnly = (iso: string) => new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+const formatTimeOnly = (iso: string) => {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+};
+const formatDateOnly = (iso: string) => {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
 const handleLogout = () => { 
     authStore.logout(); 
     localStorage.removeItem('staffCurrentTab'); 
@@ -644,10 +643,7 @@ let refreshTimeout: any = null;
 const refreshReservations = () => {
     if (refreshTimeout) clearTimeout(refreshTimeout);
     refreshTimeout = setTimeout(() => {
-        console.log('[STAFF] Fetching all reservations...');
-        reservationStore.fetchReservations().then(() => {
-            console.log('[STAFF] Total reservations in store:', reservationStore.reservations.length);
-        });
+        reservationStore.fetchReservations();
     }, 300);
 };
 
@@ -657,7 +653,6 @@ onMounted(() => {
   if (!staffSocket) {
     staffSocket = getSocket();
     const refresh = () => { 
-        console.log('[STAFF] Socket event received, refreshing...');
         refreshReservations(); 
         refreshMap(); 
     };
@@ -667,7 +662,6 @@ onMounted(() => {
   }
     if (!staffPollId) {
         staffPollId = setInterval(() => {
-            console.log('[STAFF] Polling refresh...');
             refreshReservations();
             refreshMap();
         }, 15000);
@@ -747,6 +741,13 @@ onUnmounted(() => {
 .data-table td { padding: 15px; border-bottom: 1px solid #f1f1f1; vertical-align: middle; font-size: 0.9rem; color: #2c3e50; }
 .customer-cell { display: flex; gap: 10px; align-items: center; }
 .customer-avatar { width: 32px; height: 32px; background: #ecf0f1; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #7f8c8d; }
+.time-cell { display: flex; flex-direction: column; gap: 2px; }
+.time-cell .time-big { font-size: 1rem; font-weight: 600; color: #2c3e50; }
+.time-cell .date-small { font-size: 0.8rem; color: #7f8c8d; }
+.sub-text { font-size: 0.8rem; color: #7f8c8d; margin-top: 2px; }
+.table-info { display: flex; flex-direction: column; gap: 4px; }
+.table-badge { background: #e8f4fd; color: #2980b9; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
+.people-count { font-size: 0.8rem; color: #7f8c8d; }
 .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
 .status-badge.pending { background: #fff3cd; color: #856404; }
 .status-badge.confirmed { background: #d4edda; color: #155724; }
