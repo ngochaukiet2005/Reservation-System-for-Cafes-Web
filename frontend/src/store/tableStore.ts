@@ -1,63 +1,119 @@
 // src/store/tableStore.ts
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { getSocket } from '../realtime/socket';
 
 export interface Table {
-  id: number;
-  label: string;
+  id: string;
+  name: string;
   seats: number;
-  status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'DISABLED';
-  // Đã xóa trường zone
+  status: 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'DISABLED' | 'PENDING';
 }
 
 export const useTableStore = defineStore('table', () => {
-  // 1. STATE: Mock Data (Xóa zone)
-  const tables = ref<Table[]>([
-    { id: 1, label: 'Bàn 01', seats: 4, status: 'AVAILABLE' },
-    { id: 2, label: 'Bàn 02', seats: 2, status: 'OCCUPIED' },
-    { id: 3, label: 'Bàn 03', seats: 6, status: 'RESERVED' },
-    { id: 4, label: 'Bàn 04', seats: 4, status: 'AVAILABLE' },
-    { id: 5, label: 'Bàn 05', seats: 8, status: 'DISABLED' },
-  ]);
+  const tables = ref<Table[]>([]);
 
-  const syncToStorage = () => {
-    localStorage.setItem('cafes_tables_sync', JSON.stringify(tables.value));
-  };
-
-  // 2. ACTIONS
-  const initRealTimeListener = () => {
-    const saved = localStorage.getItem('cafes_tables_sync');
-    if (saved) tables.value = JSON.parse(saved);
-
-    window.addEventListener('storage', (event) => {
-      if (event.key === 'cafes_tables_sync' && event.newValue) {
-        tables.value = JSON.parse(event.newValue);
+  // Fetch tables từ API
+  const fetchTables = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/tables', {
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('auth_token')}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        tables.value = data.data || [];
       }
-    });
-  };
-
-  const addTable = (newTable: Omit<Table, 'id' | 'status'>) => {
-    const maxId = tables.value.length > 0 ? Math.max(...tables.value.map(t => t.id)) : 0;
-    tables.value.push({
-      id: maxId + 1,
-      ...newTable,
-      status: 'AVAILABLE'
-    });
-    syncToStorage();
-  };
-
-  const updateTable = (id: number, updates: Partial<Table>) => {
-    const index = tables.value.findIndex(t => t.id === id);
-    if (index !== -1) {
-      tables.value[index] = { ...tables.value[index], ...updates };
-      syncToStorage();
+    } catch (error) {
+      console.error('[tableStore] Error fetching tables:', error);
     }
   };
 
-  const deleteTable = (id: number) => {
-    tables.value = tables.value.filter(t => t.id !== id);
-    syncToStorage();
+  // Listen socket để cập nhật table khi reservation thay đổi
+  const initRealTimeListener = () => {
+    const socket = getSocket();
+    
+    // Khi reservation created/updated/cancelled/expired → cập nhật lại tables
+    socket.on('reservation.created', () => {
+      console.log('[tableStore] Reservation created, refetching tables');
+      fetchTables();
+    });
+    
+    socket.on('reservation.updated', () => {
+      console.log('[tableStore] Reservation updated, refetching tables');
+      fetchTables();
+    });
+    
+    socket.on('reservation.cancelled', () => {
+      console.log('[tableStore] Reservation cancelled, refetching tables');
+      fetchTables();
+    });
+    
+    socket.on('reservation.expired', () => {
+      console.log('[tableStore] Reservation expired, refetching tables');
+      fetchTables();
+    });
   };
 
-  return { tables, initRealTimeListener, addTable, updateTable, deleteTable };
+  const addTable = async (newTable: Omit<Table, 'id' | 'status'>) => {
+    try {
+      const response = await fetch('http://localhost:3000/tables', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('auth_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTable),
+      });
+      if (response.ok) {
+        await fetchTables();
+      }
+    } catch (error) {
+      console.error('[tableStore] Error adding table:', error);
+    }
+  };
+
+  const updateTable = async (id: string, updates: Partial<Table>) => {
+    try {
+      const response = await fetch(`http://localhost:3000/tables/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('auth_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+      if (response.ok) {
+        await fetchTables();
+      }
+    } catch (error) {
+      console.error('[tableStore] Error updating table:', error);
+    }
+  };
+
+  const deleteTable = async (id: string) => {
+    try {
+      const response = await fetch(`http://localhost:3000/tables/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('auth_token')}`,
+        },
+      });
+      if (response.ok) {
+        await fetchTables();
+      }
+    } catch (error) {
+      console.error('[tableStore] Error deleting table:', error);
+    }
+  };
+
+  return { 
+    tables, 
+    fetchTables,
+    initRealTimeListener, 
+    addTable, 
+    updateTable, 
+    deleteTable 
+  };
 });

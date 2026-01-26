@@ -201,8 +201,12 @@ export const reservationStore = reactive({
       await this.fetchTables();
       return res;
     } catch (error: any) {
+      console.error(`[FRONTEND] Error cancelling reservation:`, error);
+      // Lấy message từ server response hoặc error message
       const message =
-        error?.response?.data?.message || error?.message || "Có lỗi xảy ra";
+        error?.response?.data?.message ||
+        error?.message ||
+        "Hủy đặt bàn thất bại";
       throw new Error(message);
     } finally {
       this.isLoading = false;

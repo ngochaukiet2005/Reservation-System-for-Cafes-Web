@@ -48,5 +48,6 @@ th { background-color: #f4f4f4; }
 .badge.confirmed { background-color: #2ecc71; }
 .badge.cancelled { background-color: #e74c3c; }
 .badge.completed { background-color: #3498db; }
+.badge.expired { background-color: #95a5a6; }
 .empty-state { text-align: center; color: #666; margin-top: 20px; font-style: italic; }
 </style>

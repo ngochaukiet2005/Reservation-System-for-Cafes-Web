@@ -352,7 +352,9 @@ const confirmCancelRequest = async () => {
       closeCancelModal();
       Swal.fire({ icon: 'success', title: 'Đã gửi yêu cầu', text: 'Yêu cầu hủy đang chờ nhân viên xác nhận.', timer: 2000, showConfirmButton: false });
     } catch (error: any) {
-      Swal.fire({ icon: 'error', title: 'Lỗi', text: error.message || 'Không thể hủy đơn' });
+      console.error('[CUSTOMER] Cancel error:', error);
+      const message = error?.message || 'Không thể hủy đơn';
+      Swal.fire({ icon: 'error', title: 'Lỗi', text: message });
     }
   }
 };
