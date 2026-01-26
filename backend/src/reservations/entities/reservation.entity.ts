@@ -62,6 +62,9 @@ export class Reservation {
   @Column({ type: 'bigint', nullable: true })
   cancelled_by?: string;
 
+  @Column({ type: 'timestamp', nullable: true })
+  expires_at?: Date;
+
   @Column({ type: 'timestamp', default: () => 'NOW()' })
   created_at!: Date;
 

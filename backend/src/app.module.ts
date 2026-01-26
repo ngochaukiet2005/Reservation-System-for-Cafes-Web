@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import databaseConfig from './config/database.config';
 import { SeedService } from './seed/seed.service';
 import { join } from 'path';
@@ -17,6 +18,8 @@ import { ReservationLogsModule } from './reservation-logs/reservation-logs.modul
       envFilePath: join(process.cwd(), '.env'),
       load: [databaseConfig],
     }),
+
+    ScheduleModule.forRoot(),
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

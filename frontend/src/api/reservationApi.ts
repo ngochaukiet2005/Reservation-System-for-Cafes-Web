@@ -7,10 +7,11 @@ export interface Reservation {
   customer_phone: string;
   reservation_time: string;
   guest_count: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'OCCUPIED' | 'COMPLETED' | 'NO_SHOW' | 'REQUEST_CANCEL';
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'OCCUPIED' | 'COMPLETED' | 'NO_SHOW' | 'REQUEST_CANCEL' | 'EXPIRED';
   table_id?: string;
   notes?: string;
   cancel_reason?: string;
+  expires_at?: string;
   table?: { id: string; name: string };
 }
 

@@ -91,34 +91,11 @@ export const reservationStore = reactive({
   },
 
   async fetchTablesByTime(date: string, time: string) {
+    // Backend đã tự động cập nhật table status theo reservations real-time
+    // Nên chỉ cần fetch tables trực tiếp từ backend mà không tính lại client-side
     this.isLoading = true;
     try {
-      const iso = `${date}T${time}`;
-      await Promise.all([this.fetchTables(), this.fetchReservations({ date })]);
-
-      const target = new Date(iso);
-      const updated = this.tables.map((t) => ({ ...t }));
-
-      this.reservations.forEach((res) => {
-        if (["CANCELLED", "COMPLETED", "NO_SHOW"].includes(res.status)) return;
-        if (!res.tableId) return;
-
-        const resTime = new Date(res.time);
-        const diffMinutes = Math.abs(
-          (target.getTime() - resTime.getTime()) / 60000,
-        );
-        if (diffMinutes >= 60) return;
-
-        const tableIdx = updated.findIndex((tb) => tb.id === res.tableId);
-        if (tableIdx === -1) return;
-        if (updated[tableIdx].status === "MAINTENANCE") return;
-
-        if (res.status === "OCCUPIED") updated[tableIdx].status = "OCCUPIED";
-        else if (res.status === "PENDING") updated[tableIdx].status = "PENDING";
-        else updated[tableIdx].status = "RESERVED";
-      });
-
-      this.tables = updated;
+      await this.fetchTables();
     } finally {
       this.isLoading = false;
     }
@@ -201,8 +178,12 @@ export const reservationStore = reactive({
       await this.fetchTables();
       return res;
     } catch (error: any) {
+      console.error(`[FRONTEND] Error cancelling reservation:`, error);
+      // Lấy message từ server response hoặc error message
       const message =
-        error?.response?.data?.message || error?.message || "Có lỗi xảy ra";
+        error?.response?.data?.message ||
+        error?.message ||
+        "Hủy đặt bàn thất bại";
       throw new Error(message);
     } finally {
       this.isLoading = false;

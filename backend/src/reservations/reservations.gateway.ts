@@ -32,7 +32,14 @@ export class ReservationsGateway implements OnGatewayConnection, OnGatewayDiscon
     // No-op
   }
 
-  emitReservation(event: 'reservation.created' | 'reservation.updated' | 'reservation.cancelled', payload: any) {
+  emitReservation(
+    event:
+      | 'reservation.created'
+      | 'reservation.updated'
+      | 'reservation.cancelled'
+      | 'reservation.expired',
+    payload: any,
+  ) {
     this.server.emit(event, payload);
   }
 
