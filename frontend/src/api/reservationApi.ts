@@ -21,6 +21,19 @@ export const reservationApi = {
     return res.data.data || []; // Extract array from { message, data }
   },
 
+  getTableReservations: async (tableId: string, date?: string) => {
+    const params = date ? { date } : {};
+    const res = await httpClient.get<{ 
+      message: string; 
+      data: { 
+        reservations: Reservation[]; 
+        earliestTime?: string; 
+        lockedAfter?: boolean;
+      } 
+    }>(`/reservations/table/${tableId}`, { params });
+    return res.data.data;
+  },
+
   createReservation: async (payload: Partial<Reservation>) => {
     const res = await httpClient.post<{ message: string; data: Reservation }>('/reservations', payload);
     return res.data.data; // Extract single object from wrapper

@@ -329,6 +329,12 @@ export class TablesService {
     const selectedDateTime = new Date(date);
     selectedDateTime.setHours(hour, minute, 0, 0);
 
+    // Tạo phạm vi ngày để tìm earliest reservation
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
     const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
 
     for (const table of tables) {
@@ -340,47 +346,45 @@ export class TablesService {
         continue;
       }
 
-      // Find reservations that are happening at the selected date/time
-      // (start_time <= selectedDateTime < end_time)
-      const activeReservations = await reservationRepo
+      // Tìm tất cả reservations trong ngày
+      const dayReservations = await reservationRepo
         .createQueryBuilder("r")
         .innerJoin("r.status", "s")
         .where("r.table_id = :tableId", { tableId: table.id })
         .andWhere("s.name IN (:...activeStatuses)", {
           activeStatuses: ["PENDING", "CONFIRMED", "OCCUPIED"],
         })
-        .andWhere("r.start_time <= :selectedDateTime", { selectedDateTime })
-        .andWhere("r.end_time > :selectedDateTime", { selectedDateTime })
-        .getCount();
+        .andWhere("r.start_time BETWEEN :dayStart AND :dayEnd", {
+          dayStart,
+          dayEnd,
+        })
+        .orderBy("r.start_time", "ASC")
+        .getMany();
 
       let newStatusName = "AVAILABLE";
 
-      if (activeReservations > 0) {
-        // Check if there's any OCCUPIED reservation at this time
-        const occupiedCount = await reservationRepo
-          .createQueryBuilder("r")
-          .innerJoin("r.status", "s")
-          .where("r.table_id = :tableId", { tableId: table.id })
-          .andWhere("s.name = :occupied", { occupied: "OCCUPIED" })
-          .andWhere("r.start_time <= :selectedDateTime", { selectedDateTime })
-          .andWhere("r.end_time > :selectedDateTime", { selectedDateTime })
-          .getCount();
+      if (dayReservations.length > 0) {
+        const earliestTime = dayReservations[0].start_time;
+        
+        // Kiểm tra xem selected time có trong khoảng reservation nào không
+        const inReservationSlot = dayReservations.some(
+          (r) => r.start_time <= selectedDateTime && r.end_time > selectedDateTime
+        );
 
-        if (occupiedCount > 0) {
-          newStatusName = "OCCUPIED";
-        } else {
-          // Check if there's any PENDING reservation
-          const pendingCount = await reservationRepo
-            .createQueryBuilder("r")
-            .innerJoin("r.status", "s")
-            .where("r.table_id = :tableId", { tableId: table.id })
-            .andWhere("s.name = :pending", { pending: "PENDING" })
-            .andWhere("r.start_time <= :selectedDateTime", { selectedDateTime })
-            .andWhere("r.end_time > :selectedDateTime", { selectedDateTime })
-            .getCount();
-
-          newStatusName = pendingCount > 0 ? "PENDING" : "RESERVED";
+        if (inReservationSlot) {
+          // Đang trong khoảng reservation → OCCUPIED hoặc RESERVED
+          const occupiedRes = dayReservations.find(
+            (r) =>
+              r.start_time <= selectedDateTime &&
+              r.end_time > selectedDateTime &&
+              r.status?.name === "OCCUPIED"
+          );
+          newStatusName = occupiedRes ? "OCCUPIED" : "RESERVED";
+        } else if (selectedDateTime >= earliestTime) {
+          // Selected time >= earliest time → Khóa bàn (RESERVED)
+          newStatusName = "RESERVED";
         }
+        // else: selectedDateTime < earliestTime → Vẫn AVAILABLE
       }
 
       // Update table status in memory

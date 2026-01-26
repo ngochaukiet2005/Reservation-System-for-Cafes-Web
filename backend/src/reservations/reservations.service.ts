@@ -66,6 +66,49 @@ export class ReservationsService {
     return query.orderBy("r.start_time", "ASC").getMany();
   }
 
+  async findByTable(
+    tableId: string,
+    date?: string,
+  ): Promise<{ reservations: Reservation[]; earliestTime?: string; lockedAfter?: boolean }> {
+    const query = this.reservationRepo
+      .createQueryBuilder("r")
+      .leftJoinAndSelect("r.table", "table")
+      .leftJoinAndSelect("r.status", "status")
+      .leftJoinAndSelect("r.customer", "customer")
+      .where("r.table_id = :tableId", { tableId })
+      .andWhere("status.name IN (:...statuses)", {
+        statuses: ["PENDING", "CONFIRMED", "OCCUPIED"],
+      });
+
+    if (date) {
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      query.andWhere("r.start_time BETWEEN :startDate AND :endDate", {
+        startDate,
+        endDate,
+      });
+    }
+
+    const reservations = await query.orderBy("r.start_time", "ASC").getMany();
+
+    // Trả về kèm thông tin earliest time nếu có
+    if (reservations.length > 0) {
+      const earliestTime = reservations[0].start_time.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      return {
+        reservations,
+        earliestTime,
+        lockedAfter: true,
+      };
+    }
+
+    return { reservations };
+  }
+
   async findOne(id: string): Promise<Reservation> {
     const reservation = await this.reservationRepo.findOne({
       where: { id },
@@ -78,48 +121,78 @@ export class ReservationsService {
   }
 
   /**
-   * Kiểm tra xung đột đặt bàn (trùng bàn/giờ)
+   * Kiểm tra xung đột đặt bàn
+   * Logic mới: Nếu đã có reservation trong ngày, chỉ cho đặt TRƯỚC reservation đầu tiên
+   * Mọi thời gian SAU reservation đầu tiên bị khóa cho đến khi checkout
    * @param tableId ID của bàn cần kiểm tra
-   * @param startTime Thời gian bắt đầu
-   * @param endTime Thời gian kết thúc
+   * @param startTime Thời gian bắt đầu đặt
+   * @param date Ngày đặt (YYYY-MM-DD)
    * @param excludeReservationId ID reservation cần loại trừ (dùng khi update)
-   * @returns true nếu có xung đột, false nếu không
+   * @returns { hasConflict: boolean, earliestTime?: string, message?: string }
    */
   private async checkTableConflict(
     tableId: string,
     startTime: Date,
-    endTime: Date,
+    date: string,
     excludeReservationId?: string,
-  ): Promise<boolean> {
-    // Lấy các status active (có thể gây xung đột)
+  ): Promise<{ hasConflict: boolean; earliestTime?: Date; message?: string }> {
+    // Lấy các status active
     const activeStatuses = await this.statusRepo.find({
       where: [{ name: "PENDING" }, { name: "CONFIRMED" }, { name: "OCCUPIED" }],
     });
     const activeStatusIds = activeStatuses.map((s) => s.id);
 
     if (activeStatusIds.length === 0) {
-      return false; // Không có status active nào
+      return { hasConflict: false };
     }
 
-    // Tìm reservation trùng lặp
+    // Tìm reservation đầu tiên trong ngày
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
     const query = this.reservationRepo
       .createQueryBuilder("r")
       .where("r.table_id = :tableId", { tableId })
       .andWhere("r.status_id IN (:...statusIds)", {
         statusIds: activeStatusIds,
       })
-      .andWhere("(r.start_time < :endTime AND r.end_time > :startTime)", {
-        startTime,
-        endTime,
+      .andWhere("r.start_time BETWEEN :dayStart AND :dayEnd", {
+        dayStart,
+        dayEnd,
       });
 
-    // Loại trừ reservation hiện tại nếu đang update
     if (excludeReservationId) {
       query.andWhere("r.id != :excludeId", { excludeId: excludeReservationId });
     }
 
-    const conflictCount = await query.getCount();
-    return conflictCount > 0;
+    const existingReservations = await query
+      .orderBy("r.start_time", "ASC")
+      .getMany();
+
+    if (existingReservations.length === 0) {
+      return { hasConflict: false };
+    }
+
+    // Lấy reservation đầu tiên
+    const earliestReservation = existingReservations[0];
+    const earliestTime = earliestReservation.start_time;
+
+    // Chỉ cho đặt TRƯỚC reservation đầu tiên
+    if (startTime >= earliestTime) {
+      const timeStr = earliestTime.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      return {
+        hasConflict: true,
+        earliestTime,
+        message: `Bàn này đã được đặt từ ${timeStr}. Bạn chỉ có thể đặt trước giờ đó.`,
+      };
+    }
+
+    return { hasConflict: false };
   }
 
   /**
@@ -276,17 +349,8 @@ export class ReservationsService {
       throw new BadRequestException("Table not found");
     }
 
-    // Kiểm tra xung đột đặt bàn
-    const hasConflict = await this.checkTableConflict(
-      dto.table_id,
-      startTime,
-      endTime,
-    );
-    if (hasConflict) {
-      throw new BadRequestException(
-        "Bàn này đã được đặt trong khung giờ này. Vui lòng chọn bàn khác hoặc thời gian khác.",
-      );
-    }
+    // NOTE: Không cần validation backend vì frontend đã khóa bàn bằng status
+    // Backend chỉ tạo reservation nếu frontend cho phép
 
     // Kiểm tra khách hàng
     const customer = await this.userRepo.findOne({ where: { id: userId } });
