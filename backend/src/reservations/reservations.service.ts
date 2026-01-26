@@ -12,7 +12,7 @@ import { TableStatus } from "../tables/entities/table-status.entity";
 import { User } from "../users/entities/user.entity";
 import { ReservationsGateway } from "./reservations.gateway";
 
-// Thời gian giữ bàn tính từ start_time (ms). Hiện tại: 1 phút.
+// Thời gian giữ bàn tính từ start_time (ms). Hiện tại: ~1 phút 40 giây.
 const HOLD_WINDOW_MS = 100 * 1000;
 
 @Injectable()
@@ -303,7 +303,7 @@ export class ReservationsService {
       special_requests: dto.notes || dto.special_requests,
       table_id: dto.table_id,
       created_by: userId,
-      // Giữ bàn tới 1 phút sau giờ bắt đầu (hold window)
+      // Hold bàn đến start_time + grace period cho khách check-in
       expires_at: new Date(startTime.getTime() + HOLD_WINDOW_MS),
     });
 

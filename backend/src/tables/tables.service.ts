@@ -1,12 +1,17 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
-import { CafeTable } from './entities/table.entity';
-import { TableStatus } from './entities/table-status.entity';
-import { Reservation } from '../reservations/entities/reservation.entity';
-import { CreateTableDto } from './dto/create-table.dto';
-import { UpdateTableDto } from './dto/update-table.dto';
-import { FilterAvailableTablesDto } from './dto/filter-available-tables.dto';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Between } from "typeorm";
+import { CafeTable } from "./entities/table.entity";
+import { TableStatus } from "./entities/table-status.entity";
+import { Reservation } from "../reservations/entities/reservation.entity";
+import { CreateTableDto } from "./dto/create-table.dto";
+import { UpdateTableDto } from "./dto/update-table.dto";
+import { FilterAvailableTablesDto } from "./dto/filter-available-tables.dto";
 
 @Injectable()
 export class TablesService {
@@ -17,149 +22,163 @@ export class TablesService {
     private readonly statusRepo: Repository<TableStatus>,
   ) {}
 
-  async findAll(): Promise<CafeTable[]> {
-    const tables = await this.tableRepo.find({ relations: ['status'], order: { sort_order: 'ASC', id: 'ASC' } });
-    
-    // Refresh table statuses based on current time and active reservations ONLY
-    // (không include future reservations, chỉ những reservation đang diễn ra)
-    const now = new Date();
+  async findAll(): Promise<any[]> {
+    // Lấy tất cả bàn cùng status hiện tại
+    const tables = await this.tableRepo.find({
+      relations: ["status"],
+      order: { sort_order: "ASC", id: "ASC" },
+    });
+
+    // Lấy tất cả reservation ACTIVE trong tương lai để kiểm tra bàn nào đang được đặt
     const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
-    
-    for (const table of tables) {
-      // Skip MAINTENANCE and DISABLED tables
-      if (table.status?.name === 'MAINTENANCE' || table.status?.name === 'DISABLED') {
-        continue;
+    const now = new Date();
+
+    const activeReservations = await reservationRepo
+      .createQueryBuilder("r")
+      .leftJoinAndSelect("r.status", "s")
+      .where("r.end_time > :now", { now })
+      .andWhere("s.name IN (:...activeStatuses)", {
+        activeStatuses: ["PENDING", "CONFIRMED", "OCCUPIED"],
+      })
+      .getMany();
+
+    // Tạo map: table_id -> reservation để lookup nhanh
+    const reservedTableMap = new Map<string, Reservation>();
+    activeReservations.forEach((res) => {
+      if (!reservedTableMap.has(res.table_id)) {
+        reservedTableMap.set(res.table_id, res);
       }
-      
-      // FIX: Chỉ check reservation đang xảy ra (start_time <= now < end_time)
-      // Không include future reservations (start_time > now)
-      const activeReservations = await reservationRepo
-        .createQueryBuilder('r')
-        .innerJoin('r.status', 's')
-        .where('r.table_id = :tableId', { tableId: table.id })
-        .andWhere('s.name IN (:...activeStatuses)', { 
-          activeStatuses: ['PENDING', 'CONFIRMED', 'OCCUPIED'] 
-        })
-        .andWhere('r.start_time <= :now', { now })
-        .andWhere('r.end_time > :now', { now })
-        .getCount();
-      
-      let newStatusName = 'AVAILABLE';
-      
-      if (activeReservations > 0) {
-        // Check if there's any OCCUPIED reservation
-        const occupiedCount = await reservationRepo
-          .createQueryBuilder('r')
-          .innerJoin('r.status', 's')
-          .where('r.table_id = :tableId', { tableId: table.id })
-          .andWhere('s.name = :occupied', { occupied: 'OCCUPIED' })
-          .andWhere('r.start_time <= :now', { now })
-          .andWhere('r.end_time > :now', { now })
-          .getCount();
-        
-        if (occupiedCount > 0) {
-          newStatusName = 'OCCUPIED';
-        } else {
-          // Check if there's any PENDING reservation
-          const pendingCount = await reservationRepo
-            .createQueryBuilder('r')
-            .innerJoin('r.status', 's')
-            .where('r.table_id = :tableId', { tableId: table.id })
-            .andWhere('s.name = :pending', { pending: 'PENDING' })
-            .andWhere('r.start_time <= :now', { now })
-            .andWhere('r.end_time > :now', { now })
-            .getCount();
-          
-          newStatusName = pendingCount > 0 ? 'PENDING' : 'RESERVED';
-        }
+    });
+
+    // Cập nhật trạng thái bàn dựa trên reservation
+    return tables.map((table) => {
+      const hasActiveReservation = reservedTableMap.has(table.id);
+
+      // Nếu bàn đang MAINTENANCE/DISABLED → giữ nguyên
+      if (
+        table.status?.name === "MAINTENANCE" ||
+        table.status?.name === "DISABLED"
+      ) {
+        return table;
       }
-      
-      // Update table status in memory (don't persist yet, just for response)
-      if (newStatusName !== table.status?.name) {
-        const newStatus = await this.statusRepo.findOne({ where: { name: newStatusName } });
-        if (newStatus) {
-          table.status = newStatus;
-          table.status_id = newStatus.id;
-        }
+
+      // Nếu có active reservation → trả về status RESERVED/OCCUPIED
+      if (hasActiveReservation) {
+        const reservation = reservedTableMap.get(table.id)!;
+        // Override status dựa trên reservation status
+        return {
+          ...table,
+          status: {
+            ...table.status,
+            name:
+              reservation.status?.name === "OCCUPIED" ? "OCCUPIED" : "RESERVED",
+          },
+          _display_status:
+            reservation.status?.name === "OCCUPIED" ? "OCCUPIED" : "RESERVED",
+        };
       }
-    }
-    
-    return tables;
+
+      // Nếu không có active reservation → AVAILABLE
+      return {
+        ...table,
+        status: {
+          ...table.status,
+          name: "AVAILABLE",
+        },
+        _display_status: "AVAILABLE",
+      };
+    });
   }
 
   async findOne(id: string): Promise<CafeTable> {
-    const table = await this.tableRepo.findOne({ where: { id }, relations: ['status'] });
+    const table = await this.tableRepo.findOne({
+      where: { id },
+      relations: ["status"],
+    });
     if (!table) throw new NotFoundException(`Table with ID ${id} not found`);
-    
+
     // Refresh table status based on current time and active reservations ONLY
-    if (table.status?.name !== 'MAINTENANCE' && table.status?.name !== 'DISABLED') {
+    if (
+      table.status?.name !== "MAINTENANCE" &&
+      table.status?.name !== "DISABLED"
+    ) {
       const now = new Date();
       const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
-      
+
       // FIX: Chỉ check reservation đang xảy ra, không include future
       const activeReservations = await reservationRepo
-        .createQueryBuilder('r')
-        .innerJoin('r.status', 's')
-        .where('r.table_id = :tableId', { tableId: id })
-        .andWhere('s.name IN (:...activeStatuses)', { 
-          activeStatuses: ['PENDING', 'CONFIRMED', 'OCCUPIED'] 
+        .createQueryBuilder("r")
+        .innerJoin("r.status", "s")
+        .where("r.table_id = :tableId", { tableId: id })
+        .andWhere("s.name IN (:...activeStatuses)", {
+          activeStatuses: ["PENDING", "CONFIRMED", "OCCUPIED"],
         })
-        .andWhere('r.start_time <= :now', { now })
-        .andWhere('r.end_time > :now', { now })
+        .andWhere("r.start_time <= :now", { now })
+        .andWhere("r.end_time > :now", { now })
         .getCount();
-      
-      let newStatusName = 'AVAILABLE';
-      
+
+      let newStatusName = "AVAILABLE";
+
       if (activeReservations > 0) {
         // Check current active reservation status
         const occupiedCount = await reservationRepo
-          .createQueryBuilder('r')
-          .innerJoin('r.status', 's')
-          .where('r.table_id = :tableId', { tableId: id })
-          .andWhere('s.name = :occupied', { occupied: 'OCCUPIED' })
-          .andWhere('r.start_time <= :now', { now })
-          .andWhere('r.end_time > :now', { now })
+          .createQueryBuilder("r")
+          .innerJoin("r.status", "s")
+          .where("r.table_id = :tableId", { tableId: id })
+          .andWhere("s.name = :occupied", { occupied: "OCCUPIED" })
+          .andWhere("r.start_time <= :now", { now })
+          .andWhere("r.end_time > :now", { now })
           .getCount();
-        
+
         if (occupiedCount > 0) {
-          newStatusName = 'OCCUPIED';
+          newStatusName = "OCCUPIED";
         } else {
           const pendingCount = await reservationRepo
-            .createQueryBuilder('r')
-            .innerJoin('r.status', 's')
-            .where('r.table_id = :tableId', { tableId: id })
-            .andWhere('s.name = :pending', { pending: 'PENDING' })
-            .andWhere('r.start_time <= :now', { now })
-            .andWhere('r.end_time > :now', { now })
+            .createQueryBuilder("r")
+            .innerJoin("r.status", "s")
+            .where("r.table_id = :tableId", { tableId: id })
+            .andWhere("s.name = :pending", { pending: "PENDING" })
+            .andWhere("r.start_time <= :now", { now })
+            .andWhere("r.end_time > :now", { now })
             .getCount();
-          
-          newStatusName = pendingCount > 0 ? 'PENDING' : 'RESERVED';
+
+          newStatusName = pendingCount > 0 ? "PENDING" : "RESERVED";
         }
       }
-      
+
       if (newStatusName !== table.status?.name) {
-        const newStatus = await this.statusRepo.findOne({ where: { name: newStatusName } });
+        const newStatus = await this.statusRepo.findOne({
+          where: { name: newStatusName },
+        });
         if (newStatus) {
           table.status = newStatus;
           table.status_id = newStatus.id;
         }
       }
     }
-    
+
     return table;
   }
 
   async create(dto: CreateTableDto): Promise<CafeTable> {
     // Check if name already exists
-    const existing = await this.tableRepo.findOne({ where: { name: dto.name } });
+    const existing = await this.tableRepo.findOne({
+      where: { name: dto.name },
+    });
     if (existing) {
-      throw new ConflictException(`Table with name "${dto.name}" already exists`);
+      throw new ConflictException(
+        `Table with name "${dto.name}" already exists`,
+      );
     }
 
     // Find AVAILABLE status
-    const availableStatus = await this.statusRepo.findOne({ where: { name: 'AVAILABLE' } });
+    const availableStatus = await this.statusRepo.findOne({
+      where: { name: "AVAILABLE" },
+    });
     if (!availableStatus) {
-      throw new NotFoundException('AVAILABLE status not found. Please run seed first.');
+      throw new NotFoundException(
+        "AVAILABLE status not found. Please run seed first.",
+      );
     }
 
     const table = this.tableRepo.create({
@@ -178,9 +197,13 @@ export class TablesService {
 
     // Check name uniqueness if changed
     if (dto.name && dto.name !== table.name) {
-      const existing = await this.tableRepo.findOne({ where: { name: dto.name } });
+      const existing = await this.tableRepo.findOne({
+        where: { name: dto.name },
+      });
       if (existing) {
-        throw new ConflictException(`Table with name "${dto.name}" already exists`);
+        throw new ConflictException(
+          `Table with name "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -189,7 +212,9 @@ export class TablesService {
       const statusId = String(dto.status_id); // Convert number to string for bigint comparison
       const status = await this.statusRepo.findOne({ where: { id: statusId } });
       if (!status) {
-        throw new NotFoundException(`Status with ID ${dto.status_id} not found`);
+        throw new NotFoundException(
+          `Status with ID ${dto.status_id} not found`,
+        );
       }
       table.status = status;
       table.status_id = status.id;
@@ -208,27 +233,27 @@ export class TablesService {
 
   async remove(id: string): Promise<void> {
     const table = await this.findOne(id);
-    
+
     // Kiểm tra xem bàn có đặt chỗ đang hoạt động không (PENDING, CONFIRMED, OCCUPIED)
     const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
     const activeReservations = await reservationRepo
-      .createQueryBuilder('r')
-      .innerJoin('r.status', 's')
-      .where('r.table_id = :tableId', { tableId: id })
-      .andWhere('s.name IN (:...activeStatuses)', { 
-        activeStatuses: ['PENDING', 'CONFIRMED', 'OCCUPIED'] 
+      .createQueryBuilder("r")
+      .innerJoin("r.status", "s")
+      .where("r.table_id = :tableId", { tableId: id })
+      .andWhere("s.name IN (:...activeStatuses)", {
+        activeStatuses: ["PENDING", "CONFIRMED", "OCCUPIED"],
       })
       .getCount();
-    
+
     if (activeReservations > 0) {
       throw new BadRequestException(
-        `Không thể xóa bàn "${table.name}" vì có ${activeReservations} đặt chỗ đang hoạt động. Vui lòng hủy hoặc hoàn thành các đặt chỗ trước.`
+        `Không thể xóa bàn "${table.name}" vì có ${activeReservations} đặt chỗ đang hoạt động. Vui lòng hủy hoặc hoàn thành các đặt chỗ trước.`,
       );
     }
-    
+
     // Xóa tất cả các đặt chỗ của bàn này (bất kể trạng thái) để tránh foreign key constraint
     await reservationRepo.delete({ table_id: id });
-    
+
     // Xóa bàn
     await this.tableRepo.remove(table);
   }
@@ -237,12 +262,14 @@ export class TablesService {
     return this.statusRepo.find();
   }
 
-  async findAvailableTables(filterDto: FilterAvailableTablesDto): Promise<CafeTable[]> {
+  async findAvailableTables(
+    filterDto: FilterAvailableTablesDto,
+  ): Promise<CafeTable[]> {
     // Parse input
     const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
     const date = new Date(filterDto.date);
-    const [startHour, startMin] = filterDto.start_time.split(':').map(Number);
-    const [endHour, endMin] = filterDto.end_time.split(':').map(Number);
+    const [startHour, startMin] = filterDto.start_time.split(":").map(Number);
+    const [endHour, endMin] = filterDto.end_time.split(":").map(Number);
 
     // Create start_time and end_time for this date
     const startDateTime = new Date(date);
@@ -252,30 +279,32 @@ export class TablesService {
     endDateTime.setHours(endHour, endMin, 0, 0);
 
     // Get AVAILABLE status
-    const availableStatus = await this.statusRepo.findOne({ where: { name: 'AVAILABLE' } });
+    const availableStatus = await this.statusRepo.findOne({
+      where: { name: "AVAILABLE" },
+    });
     if (!availableStatus) {
-      throw new NotFoundException('AVAILABLE status not found');
+      throw new NotFoundException("AVAILABLE status not found");
     }
 
     // Get all tables that are AVAILABLE and have capacity >= requested capacity
     const allTables = await this.tableRepo
-      .createQueryBuilder('t')
-      .leftJoinAndSelect('t.status', 'status')
-      .where('t.status_id = :statusId', { statusId: availableStatus.id })
-      .andWhere('t.capacity >= :capacity', { capacity: filterDto.capacity })
-      .orderBy('t.capacity', 'ASC')
-      .addOrderBy('t.sort_order', 'ASC')
+      .createQueryBuilder("t")
+      .leftJoinAndSelect("t.status", "status")
+      .where("t.status_id = :statusId", { statusId: availableStatus.id })
+      .andWhere("t.capacity >= :capacity", { capacity: filterDto.capacity })
+      .orderBy("t.capacity", "ASC")
+      .addOrderBy("t.sort_order", "ASC")
       .getMany();
 
     // Filter out tables that have conflicting reservations
     const conflictingTableIds = await reservationRepo
-      .createQueryBuilder('r')
-      .select('DISTINCT r.table_id')
-      .innerJoin('r.status', 's')
-      .where('r.start_time < :endDateTime', { endDateTime })
-      .andWhere('r.end_time > :startDateTime', { startDateTime })
-      .andWhere('s.name IN (:...activeStatuses)', {
-        activeStatuses: ['PENDING', 'CONFIRMED', 'OCCUPIED'],
+      .createQueryBuilder("r")
+      .select("DISTINCT r.table_id")
+      .innerJoin("r.status", "s")
+      .where("r.start_time < :endDateTime", { endDateTime })
+      .andWhere("r.end_time > :startDateTime", { startDateTime })
+      .andWhere("s.name IN (:...activeStatuses)", {
+        activeStatuses: ["PENDING", "CONFIRMED", "OCCUPIED"],
       })
       .getRawMany();
 
@@ -290,74 +319,82 @@ export class TablesService {
    * Used for frontend to show correct table status when user selects a different date
    */
   async findAllByDateTime(date: string, time: string): Promise<CafeTable[]> {
-    const tables = await this.tableRepo.find({ relations: ['status'], order: { sort_order: 'ASC', id: 'ASC' } });
-    
+    const tables = await this.tableRepo.find({
+      relations: ["status"],
+      order: { sort_order: "ASC", id: "ASC" },
+    });
+
     // Parse the selected date and time to a specific moment
-    const [hour, minute] = time.split(':').map(Number);
+    const [hour, minute] = time.split(":").map(Number);
     const selectedDateTime = new Date(date);
     selectedDateTime.setHours(hour, minute, 0, 0);
-    
+
     const reservationRepo = this.tableRepo.manager.getRepository(Reservation);
-    
+
     for (const table of tables) {
       // Skip MAINTENANCE and DISABLED tables
-      if (table.status?.name === 'MAINTENANCE' || table.status?.name === 'DISABLED') {
+      if (
+        table.status?.name === "MAINTENANCE" ||
+        table.status?.name === "DISABLED"
+      ) {
         continue;
       }
-      
+
       // Find reservations that are happening at the selected date/time
       // (start_time <= selectedDateTime < end_time)
       const activeReservations = await reservationRepo
-        .createQueryBuilder('r')
-        .innerJoin('r.status', 's')
-        .where('r.table_id = :tableId', { tableId: table.id })
-        .andWhere('s.name IN (:...activeStatuses)', { 
-          activeStatuses: ['PENDING', 'CONFIRMED', 'OCCUPIED'] 
+        .createQueryBuilder("r")
+        .innerJoin("r.status", "s")
+        .where("r.table_id = :tableId", { tableId: table.id })
+        .andWhere("s.name IN (:...activeStatuses)", {
+          activeStatuses: ["PENDING", "CONFIRMED", "OCCUPIED"],
         })
-        .andWhere('r.start_time <= :selectedDateTime', { selectedDateTime })
-        .andWhere('r.end_time > :selectedDateTime', { selectedDateTime })
+        .andWhere("r.start_time <= :selectedDateTime", { selectedDateTime })
+        .andWhere("r.end_time > :selectedDateTime", { selectedDateTime })
         .getCount();
-      
-      let newStatusName = 'AVAILABLE';
-      
+
+      let newStatusName = "AVAILABLE";
+
       if (activeReservations > 0) {
         // Check if there's any OCCUPIED reservation at this time
         const occupiedCount = await reservationRepo
-          .createQueryBuilder('r')
-          .innerJoin('r.status', 's')
-          .where('r.table_id = :tableId', { tableId: table.id })
-          .andWhere('s.name = :occupied', { occupied: 'OCCUPIED' })
-          .andWhere('r.start_time <= :selectedDateTime', { selectedDateTime })
-          .andWhere('r.end_time > :selectedDateTime', { selectedDateTime })
+          .createQueryBuilder("r")
+          .innerJoin("r.status", "s")
+          .where("r.table_id = :tableId", { tableId: table.id })
+          .andWhere("s.name = :occupied", { occupied: "OCCUPIED" })
+          .andWhere("r.start_time <= :selectedDateTime", { selectedDateTime })
+          .andWhere("r.end_time > :selectedDateTime", { selectedDateTime })
           .getCount();
-        
+
         if (occupiedCount > 0) {
-          newStatusName = 'OCCUPIED';
+          newStatusName = "OCCUPIED";
         } else {
           // Check if there's any PENDING reservation
           const pendingCount = await reservationRepo
-            .createQueryBuilder('r')
-            .innerJoin('r.status', 's')
-            .where('r.table_id = :tableId', { tableId: table.id })
-            .andWhere('s.name = :pending', { pending: 'PENDING' })
-            .andWhere('r.start_time <= :selectedDateTime', { selectedDateTime })
-            .andWhere('r.end_time > :selectedDateTime', { selectedDateTime })
+            .createQueryBuilder("r")
+            .innerJoin("r.status", "s")
+            .where("r.table_id = :tableId", { tableId: table.id })
+            .andWhere("s.name = :pending", { pending: "PENDING" })
+            .andWhere("r.start_time <= :selectedDateTime", { selectedDateTime })
+            .andWhere("r.end_time > :selectedDateTime", { selectedDateTime })
             .getCount();
-          
-          newStatusName = pendingCount > 0 ? 'PENDING' : 'RESERVED';
+
+          newStatusName = pendingCount > 0 ? "PENDING" : "RESERVED";
         }
       }
-      
+
       // Update table status in memory
       if (newStatusName !== table.status?.name) {
-        const newStatus = await this.statusRepo.findOne({ where: { name: newStatusName } });
+        const newStatus = await this.statusRepo.findOne({
+          where: { name: newStatusName },
+        });
         if (newStatus) {
           table.status = newStatus;
           table.status_id = newStatus.id;
         }
       }
     }
-    
+
     return tables;
   }
 }
