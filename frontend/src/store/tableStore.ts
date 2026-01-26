@@ -34,6 +34,24 @@ export const useTableStore = defineStore('table', () => {
   const initRealTimeListener = () => {
     const socket = getSocket();
     
+    // Khi table.updated → cập nhật table cụ thể trong danh sách
+    socket.on('table.updated', (updatedTable: any) => {
+      console.log('[tableStore] Table updated:', updatedTable);
+      if (updatedTable && updatedTable.id) {
+        const index = tables.value.findIndex((t) => t.id === updatedTable.id);
+        if (index !== -1) {
+          // Cập nhật table trong danh sách
+          tables.value[index] = {
+            id: updatedTable.id,
+            name: updatedTable.name,
+            seats: updatedTable.capacity,
+            status: updatedTable.status?.name || 'AVAILABLE',
+          };
+          console.log(`[tableStore] Updated table ${updatedTable.id} to status ${updatedTable.status?.name}`);
+        }
+      }
+    });
+    
     // Khi reservation created/updated/cancelled/expired → cập nhật lại tables
     socket.on('reservation.created', () => {
       console.log('[tableStore] Reservation created, refetching tables');
