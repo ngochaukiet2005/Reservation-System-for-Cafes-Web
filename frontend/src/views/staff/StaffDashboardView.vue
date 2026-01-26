@@ -336,6 +336,9 @@ const clearListFilter = () => {
     listFilter.minute = '';
 };
 
+// Không cần watch vì filter làm hoàn toàn client-side
+// Data đã được fetch hết, computed sẽ tự động filter
+
 // Actions cho List Dropdown
 const toggleListHourDropdown = () => { showListHourDropdown.value = !showListHourDropdown.value; showListMinuteDropdown.value = false; showUserMenu.value = false; };
 const toggleListMinuteDropdown = () => { showListMinuteDropdown.value = !showListMinuteDropdown.value; showListHourDropdown.value = false; showUserMenu.value = false; };
@@ -349,19 +352,23 @@ const switchToMapForCreate = () => {
 
 // Computed Filtered List
 const filteredReservations = computed(() => {
-  let data = reservationStore.reservations;
+  let data = [...reservationStore.reservations]; // Tạo bản copy mới
+  console.log('[STAFF] Computing filtered reservations. Total:', data.length);
 
   if (filterStatus.value !== 'ALL') {
     if (filterStatus.value === 'HISTORY') data = data.filter(r => ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(r.status));
     else data = data.filter(r => r.status === filterStatus.value);
+    console.log('[STAFF] After status filter:', data.length);
   }
 
   if (searchKeyword.value) {
     const k = searchKeyword.value.toLowerCase();
     data = data.filter(r => r.guestName.toLowerCase().includes(k) || r.phone.includes(k));
+    console.log('[STAFF] After search filter:', data.length);
   }
 
   if (listFilter.date || listFilter.hour !== '' || listFilter.minute !== '') {
+      console.log('[STAFF] Applying date/time filter:', listFilter);
       data = data.filter(r => {
           const rDate = new Date(r.time);
           if (listFilter.date) {
@@ -376,9 +383,12 @@ const filteredReservations = computed(() => {
           }
           return true;
       });
+      console.log('[STAFF] After date/time filter:', data.length);
   }
 
-  return data.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  const sorted = data.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  console.log('[STAFF] Final filtered count:', sorted.length);
+  return sorted;
 });
 
 const handleApprove = async (item: any) => { 
@@ -628,26 +638,44 @@ const handleLogout = () => {
 
 let staffPollId: any = null;
 let staffSocket: any = null;
+let refreshTimeout: any = null;
+
+// Debounced refresh để tránh gọi API liên tục
+const refreshReservations = () => {
+    if (refreshTimeout) clearTimeout(refreshTimeout);
+    refreshTimeout = setTimeout(() => {
+        console.log('[STAFF] Fetching all reservations...');
+        reservationStore.fetchReservations().then(() => {
+            console.log('[STAFF] Total reservations in store:', reservationStore.reservations.length);
+        });
+    }, 300);
+};
 
 onMounted(() => { 
-    reservationStore.fetchReservations(); 
+    refreshReservations(); 
     resetToNow();
   if (!staffSocket) {
     staffSocket = getSocket();
-    const refresh = () => { reservationStore.fetchReservations(); refreshMap(); };
+    const refresh = () => { 
+        console.log('[STAFF] Socket event received, refreshing...');
+        refreshReservations(); 
+        refreshMap(); 
+    };
     staffSocket.on('reservation.created', refresh);
     staffSocket.on('reservation.updated', refresh);
     staffSocket.on('reservation.cancelled', refresh);
   }
     if (!staffPollId) {
         staffPollId = setInterval(() => {
-            reservationStore.fetchReservations();
+            console.log('[STAFF] Polling refresh...');
+            refreshReservations();
             refreshMap();
         }, 15000);
     }
 });
 
 onUnmounted(() => {
+    if (refreshTimeout) clearTimeout(refreshTimeout);
     if (staffPollId) {
         clearInterval(staffPollId);
         staffPollId = null;
