@@ -54,6 +54,17 @@ export const tableApi = {
     return response.data.data;
   },
 
+  // Get tables với status tại một thời gian cụ thể
+  getTablesByDateTime: async (date: string, time: string) => {
+    const response = await httpClient.get<{ message: string; data: Table[] }>('/tables/by-datetime', {
+      params: {
+        date,
+        time,
+      },
+    });
+    return response.data.data;
+  },
+
   // Lọc bàn trống theo ngày, giờ và sức chứa
   getAvailableTables: async (payload: FilterAvailableTablesPayload) => {
     const response = await httpClient.get<{ message: string; data: Table[] }>('/tables/available', {

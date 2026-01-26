@@ -176,12 +176,16 @@ export class ReservationsService {
       const activeStatusIds = activeStatuses.map((s) => s.id);
 
       const now = new Date();
+      // FIX: Kiểm tra cả start_time và end_time để đảm bảo reservation chưa kết thúc
+      // r.start_time <= :now để không lấy reservation trong tương lai
+      // r.end_time > :now để đảm bảo reservation vẫn còn hiệu lực
       const activeReservations = await this.reservationRepo
         .createQueryBuilder("r")
         .where("r.table_id = :tableId", { tableId })
         .andWhere("r.status_id IN (:...statusIds)", {
           statusIds: activeStatusIds,
         })
+        .andWhere("r.start_time <= :now", { now })
         .andWhere("r.end_time > :now", { now })
         .getCount();
 
@@ -193,6 +197,7 @@ export class ReservationsService {
             .createQueryBuilder("r")
             .where("r.table_id = :tableId", { tableId })
             .andWhere("r.status_id = :pendingId", { pendingId: pendingStatus.id })
+            .andWhere("r.start_time <= :now", { now })
             .andWhere("r.end_time > :now", { now })
             .getCount();
           
