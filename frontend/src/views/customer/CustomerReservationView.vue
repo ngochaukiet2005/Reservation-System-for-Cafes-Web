@@ -170,6 +170,47 @@
         </div>
       </div>
     </transition>
+
+    <!-- Reservations Warning Modal -->
+    <transition name="fade">
+      <div v-if="showReservationsWarning" class="modal-overlay" @click.self="closeReservationsWarning">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>📋 Bàn {{ selectedTableForWarning?.name }} - Thông tin lịch đặt</h3>
+            <button class="close-btn" @click="closeReservationsWarning">×</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="tableReservations.length > 0" class="reservations-list">
+              <div class="warning-box">
+                <p class="warning-title">⚠️ Bàn này sẽ có khách sau:</p>
+              </div>
+              
+              <div
+                v-for="res in tableReservations"
+                :key="res.id"
+                class="reservation-item"
+              >
+                <div class="res-time">🕐 {{ formatReservationTime(res.start_time) }}</div>
+                <div class="res-status">
+                  <span class="badge" :class="res.status.name.toLowerCase()">
+                    {{ getStatusLabel(res.status.name) }}
+                  </span>
+                </div>
+                <div class="res-info">👥 {{ res.num_guests }} người</div>
+              </div>
+              
+              <p class="info-text">
+                💡 Bạn có thể đặt bàn này, nhưng sẽ cần rời bàn khi khách đó đến. Bàn sẽ bị khóa từ {{ formatReservationTime(tableReservations[0].start_time) }} trở đi.
+              </p>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" @click="closeReservationsWarning">Hủy bỏ</button>
+            <button class="btn-primary" @click="confirmTableSelection">Đồng ý đặt</button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -181,6 +222,7 @@ import ReservationForm from "../../components/reservations/ReservationForm.vue";
 import TableMap from "../../components/map/TableMap.vue";
 import { getSocket } from "../../realtime/socket";
 import { tableApi } from "../../api/tableApi";
+import { reservationApi } from "../../api/reservationApi";
 
 const router = useRouter();
 const today = new Date().toISOString().split("T")[0];
@@ -188,6 +230,11 @@ const showForm = ref(false);
 const showSuccessModal = ref(false);
 const selectedTable = ref<Table | null>(null);
 const isSearching = ref(false);
+
+// Modal hiển thị reservations warning
+const showReservationsWarning = ref(false);
+const selectedTableForWarning = ref<Table | null>(null);
+const tableReservations = ref<any[]>([]);
 const showMinuteDropdown = ref(false);
 
 const OPEN_HOUR = 8;
@@ -373,8 +420,65 @@ const calculateEndTime = (startTime: string): string => {
   return `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
 };
 
-const selectTable = (table: Table) => {
-  if (table.status === "AVAILABLE") selectedTable.value = table;
+const selectTable = async (table: Table) => {
+  // Chỉ cho chọn bàn AVAILABLE (bàn khóa status=RESERVED sẽ không click được)
+  if (table.status !== "AVAILABLE") {
+    return;
+  }
+
+  selectedTableForWarning.value = table;
+  
+  try {
+    // Lấy danh sách reservations của bàn trong ngày
+    const result = await reservationApi.getTableReservations(table.id, filter.date);
+    tableReservations.value = result.reservations || [];
+    
+    // Nếu có reservation → Hiển thị warning
+    if (tableReservations.value.length > 0) {
+      showReservationsWarning.value = true;
+    } else {
+      // Nếu không có reservation → Mở form ngay
+      selectedTable.value = table;
+      showForm.value = true;
+    }
+  } catch (error) {
+    console.error("Error fetching table reservations:", error);
+    // Nếu lỗi, vẫn cho phép chọn bàn
+    selectedTable.value = table;
+    showForm.value = true;
+  }
+};
+
+const closeReservationsWarning = () => {
+  showReservationsWarning.value = false;
+  selectedTableForWarning.value = null;
+  tableReservations.value = [];
+};
+
+const confirmTableSelection = () => {
+  if (selectedTableForWarning.value) {
+    selectedTable.value = selectedTableForWarning.value;
+  }
+  closeReservationsWarning();
+  showForm.value = true;
+};
+
+const formatReservationTime = (timeStr: string) => {
+  const date = new Date(timeStr);
+  return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+};
+
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    PENDING: "Chờ duyệt",
+    CONFIRMED: "Đã xác nhận",
+    OCCUPIED: "Đang ngồi",
+    COMPLETED: "Hoàn thành",
+    CANCELLED: "Đã hủy",
+    NO_SHOW: "Không đến",
+    EXPIRED: "Hết hạn",
+  };
+  return labels[status] || status;
 };
 
 const suggestTable = suggestTableAfterSearch;
@@ -883,6 +987,383 @@ onUnmounted(() => {
   color: #666;
   margin-bottom: 30px;
 }
+
+/* Reservations Warning Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 2500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-box {
+  background: #fff;
+  padding: 0;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.warning-box {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 2px solid #ffc107;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.warning-title {
+  color: #d63031;
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0;
+}
+
+.reservations-list {
+  margin-top: 12px;
+}
+
+.reservation-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.res-time {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  min-width: 60px;
+}
+
+.res-status .badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.res-status .badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.res-status .badge.confirmed {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.res-status .badge.occupied {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.res-info {
+  color: #666;
+  font-size: 14px;
+}
+
+.info-text {
+  color: #666;
+  font-size: 14px;
+  margin-top: 16px;
+  padding: 12px;
+  background: #e3f2fd;
+  border-radius: 8px;
+  border-left: 3px solid #2196f3;
+}
+
+.modal-actions {
+  padding: 16px 24px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  background: #f8f9fa;
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+.success-box h3 {
+  color: #2ecc71;
+  margin: 0 0 10px;
+}
+.success-box p {
+  color: #666;
+  margin-bottom: 30px;
+}
+
+/* Table Reservations Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 2500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-box {
+  background: #fff;
+  padding: 0;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.no-data {
+  text-align: center;
+  color: #28a745;
+  padding: 30px 20px;
+  font-size: 16px;
+}
+
+.locked-info {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 2px solid #ffc107;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.lock-warning {
+  color: #d63031;
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lock-detail {
+  color: #e17055;
+  font-size: 14px;
+  margin: 0;
+}
+
+.lock-detail strong {
+  color: #d63031;
+  font-size: 15px;
+}
+
+.reservations-header {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.warning-text {
+  color: #ff9800;
+  font-weight: 600;
+  margin-bottom: 16px;
+  font-size: 15px;
+}
+
+.info-text {
+  color: #666;
+  font-size: 14px;
+  margin-top: 16px;
+  padding: 12px;
+  background: #e3f2fd;
+  border-radius: 8px;
+  border-left: 3px solid #2196f3;
+}
+
+.reservations-list {
+  margin-top: 12px;
+}
+
+.reservation-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.res-time {
+  flex: 1;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.res-status .badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.res-status .badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.res-status .badge.confirmed {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.res-status .badge.occupied {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.res-info {
+  color: #666;
+  font-size: 14px;
+}
+
+.modal-actions {
+  padding: 16px 24px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  background: #f8f9fa;
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+
 .btn-primary {
   background: #1a1a1a;
   color: #fff;

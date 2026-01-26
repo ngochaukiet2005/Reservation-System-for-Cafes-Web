@@ -18,6 +18,21 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
 
+  @Get("table/:tableId")
+  async findByTable(
+    @Param("tableId") tableId: string,
+    @Query("date") date?: string,
+  ) {
+    const reservations = await this.reservationsService.findByTable(
+      tableId,
+      date,
+    );
+    return {
+      message: "Table reservations retrieved successfully",
+      data: reservations,
+    };
+  }
+
   @Get()
   async findAll(
     @Query("status") status?: string,
