@@ -30,14 +30,14 @@
       </div>
 
       <div class="stat-card staff">
-        <div class="icon">users</div>
+        <div class="icon">👥</div>
         <div class="info">
           <h3>Tổng nhân viên</h3>
           <p>{{ stats.totalStaff }} người</p>
         </div>
       </div>
     </div>
-    
+
     <div class="recent-activity section-box">
       <h2>Hoạt động gần đây</h2>
       <p class="empty-text">Chưa có hoạt động mới ghi nhận.</p>
@@ -46,20 +46,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { adminApi, type DashboardStats } from '../../api/adminApi';
+import { ref, onMounted } from "vue";
+import { adminApi, type DashboardStats } from "../../api/adminApi";
 
 const stats = ref<DashboardStats>({
   totalRevenue: 0,
   totalOrders: 0,
   activeTables: 0,
-  totalStaff: 0
+  totalStaff: 0,
 });
 
 const loading = ref(true);
 
 const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(value);
 };
 
 onMounted(async () => {
@@ -93,7 +96,7 @@ onMounted(async () => {
   background: white;
   padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   transition: transform 0.2s;
@@ -123,16 +126,28 @@ onMounted(async () => {
   color: #2c3e50;
   margin: 5px 0 0 0;
 }
-.revenue .icon { color: #27ae60; background: #eafaf1; }
-.orders .icon { color: #2980b9; background: #ebf5fb; }
-.tables .icon { color: #e67e22; background: #fdf2e9; }
-.staff .icon { color: #8e44ad; background: #f4ecf7; }
+.revenue .icon {
+  color: #27ae60;
+  background: #eafaf1;
+}
+.orders .icon {
+  color: #2980b9;
+  background: #ebf5fb;
+}
+.tables .icon {
+  color: #e67e22;
+  background: #fdf2e9;
+}
+.staff .icon {
+  color: #8e44ad;
+  background: #f4ecf7;
+}
 
 .section-box {
   background: white;
   padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 .empty-text {
   color: #95a5a6;
