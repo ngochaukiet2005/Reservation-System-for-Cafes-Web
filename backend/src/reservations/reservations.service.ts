@@ -117,6 +117,11 @@ export class ReservationsService {
   }
 
   async create(dto: any, userId: string): Promise<Reservation> {
+    // Validate table_id
+    if (!dto.table_id) {
+      throw new BadRequestException("table_id is required. Please select a table.");
+    }
+
     // Lấy status PENDING
     const pendingStatus = await this.statusRepo.findOne({
       where: { name: "PENDING" },
@@ -128,26 +133,24 @@ export class ReservationsService {
     const startTime = new Date(dto.reservation_time || dto.start_time);
     const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 giờ sau
 
-    // Kiểm tra bàn nếu có
-    if (dto.table_id) {
-      const table = await this.tableRepo.findOne({
-        where: { id: dto.table_id },
-      });
-      if (!table) {
-        throw new BadRequestException("Table not found");
-      }
+    // Kiểm tra bàn
+    const table = await this.tableRepo.findOne({
+      where: { id: dto.table_id },
+    });
+    if (!table) {
+      throw new BadRequestException("Table not found");
+    }
 
-      // Kiểm tra xung đột đặt bàn
-      const hasConflict = await this.checkTableConflict(
-        dto.table_id,
-        startTime,
-        endTime,
+    // Kiểm tra xung đột đặt bàn
+    const hasConflict = await this.checkTableConflict(
+      dto.table_id,
+      startTime,
+      endTime,
+    );
+    if (hasConflict) {
+      throw new BadRequestException(
+        "Bàn này đã được đặt trong khung giờ này. Vui lòng chọn bàn khác hoặc thời gian khác.",
       );
-      if (hasConflict) {
-        throw new BadRequestException(
-          "Bàn này đã được đặt trong khung giờ này. Vui lòng chọn bàn khác hoặc thời gian khác.",
-        );
-      }
     }
 
     // Kiểm tra khách hàng
