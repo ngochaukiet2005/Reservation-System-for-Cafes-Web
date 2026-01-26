@@ -34,16 +34,12 @@ export const useTableStore = defineStore('table', () => {
   const initRealTimeListener = () => {
     const socket = getSocket();
     
-<<<<<<< HEAD
-    // Khi BẤT CỨ ai đặt/hủy/cập nhật reservation → TẤT CẢ khách hàng cập nhật lại tables
-=======
-    // Khi table.updated → cập nhật table cụ thể trong danh sách
+    // Khi table.updated → cập nhật table cụ thể; nếu không tìm thấy thì refetch toàn bộ
     socket.on('table.updated', (updatedTable: any) => {
       console.log('[tableStore] Table updated:', updatedTable);
       if (updatedTable && updatedTable.id) {
         const index = tables.value.findIndex((t) => t.id === updatedTable.id);
         if (index !== -1) {
-          // Cập nhật table trong danh sách
           tables.value[index] = {
             id: updatedTable.id,
             name: updatedTable.name,
@@ -51,12 +47,13 @@ export const useTableStore = defineStore('table', () => {
             status: updatedTable.status?.name || 'AVAILABLE',
           };
           console.log(`[tableStore] Updated table ${updatedTable.id} to status ${updatedTable.status?.name}`);
+          return;
         }
       }
+      fetchTables();
     });
-    
+
     // Khi reservation created/updated/cancelled/expired → cập nhật lại tables
->>>>>>> f473ebfa99a075f4360f2668165ead0180386442
     socket.on('reservation.created', () => {
       console.log('[tableStore] Reservation created by someone, refetching tables for all users');
       fetchTables();
@@ -77,11 +74,6 @@ export const useTableStore = defineStore('table', () => {
       fetchTables();
     });
 
-    // Cũng listen trực tiếp table.updated event nếu có
-    socket.on('table.updated', (data: any) => {
-      console.log('[tableStore] Table updated directly:', data);
-      fetchTables();
-    });
   };
 
   const addTable = async (newTable: Omit<Table, 'id' | 'status'>) => {

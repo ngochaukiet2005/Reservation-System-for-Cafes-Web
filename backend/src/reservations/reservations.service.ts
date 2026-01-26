@@ -12,13 +12,8 @@ import { TableStatus } from "../tables/entities/table-status.entity";
 import { User } from "../users/entities/user.entity";
 import { ReservationsGateway } from "./reservations.gateway";
 
-<<<<<<< HEAD
-// Grace period cho khách check-in (1 phút sau giờ bắt đầu)
-const CHECKIN_GRACE_PERIOD_MS = 1 * 60 * 1000;
-=======
-// Thời gian giữ bàn tính từ start_time (ms). Hiện tại: 1 phút.
+// Thời gian giữ bàn tính từ start_time (ms). Hiện tại: ~1 phút 40 giây.
 const HOLD_WINDOW_MS = 100 * 1000;
->>>>>>> f473ebfa99a075f4360f2668165ead0180386442
 
 @Injectable()
 export class ReservationsService {
@@ -303,9 +298,8 @@ export class ReservationsService {
       special_requests: dto.notes || dto.special_requests,
       table_id: dto.table_id,
       created_by: userId,
-      // Hold bàn đến start_time + 1 phút (grace period cho khách check-in)
-      // Nếu quá 1 phút mà chưa check-in → EXPIRED
-      expires_at: new Date(startTime.getTime() + CHECKIN_GRACE_PERIOD_MS),
+      // Hold bàn đến start_time + grace period cho khách check-in
+      expires_at: new Date(startTime.getTime() + HOLD_WINDOW_MS),
     });
 
     const savedReservation = await this.reservationRepo.save(reservation);

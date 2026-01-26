@@ -413,18 +413,6 @@ onMounted(() => {
     }
     
     // Listen socket events - chỉ refresh khi không đang điền form
-<<<<<<< HEAD
-    // Luôn setup lại listeners mỗi lần mount để đảm bảo nhận events
-    customerSocket = getSocket();
-    const refresh = () => {
-      if (!showForm.value) {
-        loadTables(false); // Background refresh
-      }
-    };
-    customerSocket.on('reservation.created', refresh);
-    customerSocket.on('reservation.updated', refresh);
-    customerSocket.on('reservation.cancelled', refresh);
-=======
     if (!customerSocket) {
       customerSocket = getSocket();
       const refresh = () => {
@@ -442,7 +430,6 @@ onMounted(() => {
         if (updatedTable && updatedTable.id) {
           const index = reservationStore.tables.findIndex((t: any) => t.id === updatedTable.id);
           if (index !== -1) {
-            // Cập nhật table trong danh sách
             reservationStore.tables[index] = {
               id: updatedTable.id,
               name: updatedTable.name,
@@ -454,7 +441,6 @@ onMounted(() => {
         }
       });
     }
->>>>>>> f473ebfa99a075f4360f2668165ead0180386442
 });
 
 onUnmounted(() => {
