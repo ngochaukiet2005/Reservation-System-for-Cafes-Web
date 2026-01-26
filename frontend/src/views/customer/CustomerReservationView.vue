@@ -277,55 +277,53 @@ const loadTables = async (manualTrigger = false) => {
   isSearching.value = manualTrigger; // Chỉ show loading khi manual
   
   try {
+    // Luôn lấy TẤT CẢ bàn với status thực tế từ backend (không chỉ AVAILABLE)
+    const allTables = await reservationStore.fetchTables();
+    
+    // Filter client-side theo ngày, giờ và sức chứa
     if (filter.people === 0) {
       // Hiển thị TẤT CẢ các bàn (không lọc theo capacity)
-      await reservationStore.fetchTablesByTime(filter.date, formatTimeDisplay.value);
+      // Nhưng vẫn lọc theo status: chỉ show AVAILABLE, PENDING, RESERVED
+      // Lý do: PENDING = chờ duyệt (khách hàng cần thấy), RESERVED = đã đặt (khách hàng cần thấy)
+      reservationStore.tables = allTables.filter((table: any) => 
+        ['AVAILABLE', 'PENDING', 'RESERVED'].includes(table.status)
+      );
     } else {
-      // Lọc bàn trống theo ngày, giờ, sức chứa
-      // Gọi API với capacity = 1 để lấy tất cả bàn trống
-      const availableTables = await tableApi.getAvailableTables({
-        date: filter.date,
-        start_time: formatTimeDisplay.value,
-        end_time: calculateEndTime(formatTimeDisplay.value),
-        capacity: 1 // Lấy tất cả bàn trống
-      });
+      // Lọc bàn theo sức chứa và status
+      let filteredTables = allTables.filter((table: any) => 
+        ['AVAILABLE', 'PENDING', 'RESERVED'].includes(table.status)
+      );
       
-      // Lọc client-side theo range capacity
-      let filteredTables = availableTables;
       if (filter.people === 2) {
         // 1-2 người: chỉ lấy bàn capacity 1-2
-        filteredTables = availableTables.filter((table: any) => table.capacity >= 1 && table.capacity <= 2);
+        filteredTables = filteredTables.filter((table: any) => table.capacity >= 1 && table.capacity <= 2);
       } else if (filter.people === 4) {
         // 3-4 người: chỉ lấy bàn capacity 3-4
-        filteredTables = availableTables.filter((table: any) => table.capacity >= 3 && table.capacity <= 4);
+        filteredTables = filteredTables.filter((table: any) => table.capacity >= 3 && table.capacity <= 4);
       } else if (filter.people === 6) {
         // 5+ người: chỉ lấy bàn capacity >= 5
-        filteredTables = availableTables.filter((table: any) => table.capacity >= 5);
+        filteredTables = filteredTables.filter((table: any) => table.capacity >= 5);
       }
       
-      // Cập nhật bàn từ kết quả lọc
-      reservationStore.tables = filteredTables.map((table: any) => ({
-        ...table,
-        status: 'AVAILABLE'
-      }));
+      reservationStore.tables = filteredTables;
     }
     
     if (reservationStore.tables.length === 0) {
       alert('Không tìm thấy bàn trong thời gian này. Vui lòng chọn thời gian khác.');
     }
-  } catch (error) {
-    console.error('Lỗi khi lọc bàn:', error);
-    alert('Không thể tải danh sách bàn. Vui lòng thử lại.');
     
     // Validate selectedTable sau khi load - nếu bàn đã chọn không còn available thì clear
     if (selectedTable.value && !manualTrigger) {
-      const stillAvailable = reservationStore.tables.find(
+      const stillValid = reservationStore.tables.find(
         (t: any) => t.id === selectedTable.value?.id && t.status === 'AVAILABLE'
       );
-      if (!stillAvailable) {
+      if (!stillValid) {
         selectedTable.value = null;
       }
     }
+  } catch (error) {
+    console.error('Lỗi khi lọc bàn:', error);
+    alert('Không thể tải danh sách bàn. Vui lòng thử lại.');
   } finally {
     isSearching.value = false;
   }
@@ -425,6 +423,24 @@ onMounted(() => {
       customerSocket.on('reservation.created', refresh);
       customerSocket.on('reservation.updated', refresh);
       customerSocket.on('reservation.cancelled', refresh);
+      
+      // Listen table.updated để cập nhật trạng thái bàn real-time
+      customerSocket.on('table.updated', (updatedTable: any) => {
+        console.log('[CustomerReservation] Table updated:', updatedTable);
+        if (updatedTable && updatedTable.id) {
+          const index = reservationStore.tables.findIndex((t: any) => t.id === updatedTable.id);
+          if (index !== -1) {
+            // Cập nhật table trong danh sách
+            reservationStore.tables[index] = {
+              id: updatedTable.id,
+              name: updatedTable.name,
+              capacity: updatedTable.capacity,
+              status: updatedTable.status?.name || 'AVAILABLE',
+            };
+            console.log(`[CustomerReservation] Updated table ${updatedTable.id} to status ${updatedTable.status?.name}`);
+          }
+        }
+      });
     }
 });
 
@@ -437,6 +453,7 @@ onUnmounted(() => {
     customerSocket.off('reservation.created');
     customerSocket.off('reservation.updated');
     customerSocket.off('reservation.cancelled');
+    customerSocket.off('table.updated');
     customerSocket = null;
   }
 });

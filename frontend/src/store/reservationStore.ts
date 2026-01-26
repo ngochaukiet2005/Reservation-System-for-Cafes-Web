@@ -127,13 +127,13 @@ export const reservationStore = reactive({
           payload.reservation_time || `${payload.date}T${payload.time}`,
         guest_count: payload.people || payload.guest_count || 2,
         table_id: payload.tableId ? String(payload.tableId) : undefined,
-        notes: payload.notes,
+        notes: payload.note || payload.notes,
       });
       const mapped = mapReservation(created);
       this.reservations.unshift(mapped);
-      if (mapped.tableId) {
-        await this.fetchTables();
-      }
+      // Luôn reload toàn bộ bàn từ API để lấy status cập nhật
+      // Vì bàn vừa được đặt sẽ chuyển từ AVAILABLE → PENDING
+      await this.fetchTables();
       return mapped;
     } finally {
       this.isLoading = false;
