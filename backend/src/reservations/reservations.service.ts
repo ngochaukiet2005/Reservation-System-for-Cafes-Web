@@ -177,20 +177,53 @@ export class ReservationsService {
     return reloaded;
   }
 
-  async update(id: string, dto: any): Promise<Reservation> {
+  async update(
+    id: string,
+    dto: any,
+    userId: string,
+    userRole?: string,
+  ): Promise<Reservation> {
     const reservation = await this.findOne(id);
+
+    const role = (userRole || "").toUpperCase();
+    // Kiểm tra quyền: CUSTOMER chỉ được update reservation của mình
+    const isOwner = `${reservation.customer_id}` === `${userId}`;
+    if (role === "CUSTOMER" && !isOwner) {
+      throw new BadRequestException("Bạn không có quyền chỉnh sửa đặt bàn này");
+    }
+
     Object.assign(reservation, dto);
     reservation.updated_at = new Date();
     return this.reservationRepo.save(reservation);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, userId: string, userRole?: string): Promise<void> {
     const reservation = await this.findOne(id);
+
+    const role = (userRole || "").toUpperCase();
+    // Kiểm tra quyền: CUSTOMER chỉ được xóa reservation của mình
+    const isOwner = `${reservation.customer_id}` === `${userId}`;
+    if (role === "CUSTOMER" && !isOwner) {
+      throw new BadRequestException("Bạn không có quyền xóa đặt bàn này");
+    }
+
     await this.reservationRepo.remove(reservation);
   }
 
-  async cancel(id: string, reason?: string): Promise<Reservation> {
+  async cancel(
+    id: string,
+    reason?: string,
+    userId?: string,
+    userRole?: string,
+  ): Promise<Reservation> {
     const reservation = await this.findOne(id);
+
+    const role = (userRole || "").toUpperCase();
+    // Kiểm tra quyền: CUSTOMER chỉ được hủy reservation của mình
+    const isOwner = `${reservation.customer_id}` === `${userId}`;
+    if (userId && role === "CUSTOMER" && !isOwner) {
+      throw new BadRequestException("Bạn không có quyền hủy đặt bàn này");
+    }
 
     // Nếu PENDING → CANCELLED, nếu CONFIRMED → REQUEST_CANCEL
     let targetStatusName = "CANCELLED";
