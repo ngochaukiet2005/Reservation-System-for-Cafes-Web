@@ -470,13 +470,16 @@ const formatReservationTime = (timeStr: string) => {
 
 const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
-    PENDING: "Chờ duyệt",
-    CONFIRMED: "Đã xác nhận",
-    OCCUPIED: "Đang ngồi",
-    COMPLETED: "Hoàn thành",
-    CANCELLED: "Đã hủy",
-    NO_SHOW: "Không đến",
-    EXPIRED: "Hết hạn",
+    AVAILABLE: "🟢 Trống",
+    RESERVED: "🟠 Có khách đặt",
+    OCCUPIED: "🔴 Có khách",
+    PENDING: "⏳ Chờ duyệt",
+    CONFIRMED: "✅ Đã xác nhận",
+    COMPLETED: "✓ Hoàn thành",
+    CANCELLED: "❌ Đã hủy",
+    NO_SHOW: "⚠️ Không đến",
+    EXPIRED: "⏰ Hết hạn",
+    REQUEST_CANCEL: "❌ Yêu cầu hủy",
   };
   return labels[status] || status;
 };

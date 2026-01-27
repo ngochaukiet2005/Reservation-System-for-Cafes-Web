@@ -34,12 +34,17 @@ export class ReservationsService {
   async findAll(filters?: {
     status?: string;
     date?: string;
-  }): Promise<Reservation[]> {
+  }, user?: User): Promise<Reservation[]> {
     const query = this.reservationRepo
       .createQueryBuilder("r")
       .leftJoinAndSelect("r.table", "table")
       .leftJoinAndSelect("r.status", "status")
       .leftJoinAndSelect("r.customer", "customer");
+
+    // Chỉ khách hàng xem được đơn của chính họ
+    if (user?.role?.name === "CUSTOMER") {
+      query.andWhere("r.customer_id = :customerId", { customerId: user.id });
+    }
 
     if (filters?.status) {
       const statusRecord = await this.statusRepo.findOne({
@@ -109,7 +114,7 @@ export class ReservationsService {
     return { reservations };
   }
 
-  async findOne(id: string): Promise<Reservation> {
+  async findOne(id: string, user?: User): Promise<Reservation> {
     const reservation = await this.reservationRepo.findOne({
       where: { id },
       relations: ["table", "customer", "status"],
@@ -117,6 +122,12 @@ export class ReservationsService {
     if (!reservation) {
       throw new NotFoundException(`Reservation with ID ${id} not found`);
     }
+
+    // Khách chỉ xem được đơn của mình
+    if (user?.role?.name === "CUSTOMER" && `${reservation.customer_id}` !== `${user.id}`) {
+      throw new BadRequestException("Bạn không có quyền xem đặt bàn này");
+    }
+
     return reservation;
   }
 
@@ -136,6 +147,8 @@ export class ReservationsService {
     date: string,
     excludeReservationId?: string,
   ): Promise<{ hasConflict: boolean; earliestTime?: Date; message?: string }> {
+    // Yêu cầu: mọi đặt bàn sau slot đầu tiên phải cách ít nhất 1 giờ trước giờ sớm nhất
+    const MIN_LEAD_MS = 60 * 60 * 1000;
     // Lấy các status active
     const activeStatuses = await this.statusRepo.find({
       where: [{ name: "PENDING" }, { name: "CONFIRMED" }, { name: "OCCUPIED" }],
@@ -179,20 +192,33 @@ export class ReservationsService {
     const earliestReservation = existingReservations[0];
     const earliestTime = earliestReservation.start_time;
 
-    // Chỉ cho đặt TRƯỚC reservation đầu tiên
-    if (startTime >= earliestTime) {
-      const timeStr = earliestTime.toLocaleTimeString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
+    // Chỉ cho đặt trước (earliest - 1h). Ví dụ earliest = 11:00 → đặt muộn nhất 10:00.
+    const latestAllowed = new Date(earliestTime.getTime() - MIN_LEAD_MS);
+    if (startTime > latestAllowed) {
+      const timeStr = earliestTime.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const latestStr = latestAllowed.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
       });
       return {
         hasConflict: true,
         earliestTime,
-        message: `Bàn này đã được đặt từ ${timeStr}. Bạn chỉ có thể đặt trước giờ đó.`,
+        message: `Bàn đã có khách lúc ${timeStr}. Bạn chỉ có thể đặt sớm hơn hoặc bằng ${latestStr}.`,
       };
     }
 
     return { hasConflict: false };
+  }
+
+  /** Lấy chuỗi ngày theo local (YYYY-MM-DD) để tránh lệch timezone */
+  private getLocalDateKey(date: Date): string {
+    const y = date.getFullYear();
+    const m = `${date.getMonth() + 1}`.padStart(2, "0");
+    const d = `${date.getDate()}`.padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
 
   /**
@@ -349,8 +375,15 @@ export class ReservationsService {
       throw new BadRequestException("Table not found");
     }
 
-    // NOTE: Không cần validation backend vì frontend đã khóa bàn bằng status
-    // Backend chỉ tạo reservation nếu frontend cho phép
+    // Backend vẫn kiểm tra chồng chéo để đảm bảo an toàn
+    const conflict = await this.checkTableConflict(
+      dto.table_id,
+      startTime,
+      this.getLocalDateKey(startTime),
+    );
+    if (conflict.hasConflict) {
+      throw new BadRequestException(conflict.message);
+    }
 
     // Kiểm tra khách hàng
     const customer = await this.userRepo.findOne({ where: { id: userId } });
@@ -406,7 +439,25 @@ export class ReservationsService {
       throw new BadRequestException("Bạn không có quyền chỉnh sửa đặt bàn này");
     }
 
+    // Chuẩn hóa dữ liệu thời gian và bàn mới (nếu có)
+    const newStart = new Date(dto.reservation_time || dto.start_time || reservation.start_time);
+
+    const targetTableId = dto.table_id || reservation.table_id;
+
+    // Kiểm tra chồng chéo theo rule mới
+    const conflict = await this.checkTableConflict(
+      String(targetTableId),
+      newStart,
+      this.getLocalDateKey(newStart),
+      reservation.id,
+    );
+    if (conflict.hasConflict) {
+      throw new BadRequestException(conflict.message);
+    }
+
     Object.assign(reservation, dto);
+    reservation.start_time = newStart;
+    reservation.end_time = new Date(newStart.getTime() + 60 * 60 * 1000);
     reservation.updated_at = new Date();
     return this.reservationRepo.save(reservation);
   }

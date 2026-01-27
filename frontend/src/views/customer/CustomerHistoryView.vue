@@ -148,7 +148,6 @@
               >
                 Hủy
               </button>
-              <span v-else class="text-gray">--</span>
             </td>
 
           </tr>
