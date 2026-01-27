@@ -56,12 +56,12 @@ const emit = defineEmits(['click-table']);
 
 const getStatusLabel = (s: string) => {
   const map: any = { 
-    AVAILABLE: 'Trống', 
-    RESERVED: 'Đã đặt', 
-    OCCUPIED: 'Có khách', 
-    DISABLED: 'Bảo trì',
-    PENDING: 'Chờ duyệt',
-    MAINTENANCE: 'Bảo trì'
+    AVAILABLE: '🟢 Trống', 
+    RESERVED: '🟠 Có khách đặt', 
+    OCCUPIED: '🔴 Có khách', 
+    DISABLED: '⚪ Bảo trì',
+    PENDING: '🟡 Chờ duyệt',
+    MAINTENANCE: '⚪ Bảo trì'
   };
   return map[s] || s;
 };

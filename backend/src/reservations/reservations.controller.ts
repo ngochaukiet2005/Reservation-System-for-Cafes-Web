@@ -37,11 +37,12 @@ export class ReservationsController {
   async findAll(
     @Query("status") status?: string,
     @Query("date") date?: string,
+    @Request() req?: any,
   ) {
     const reservations = await this.reservationsService.findAll({
       status,
       date,
-    });
+    }, req?.user);
     return {
       message: "Reservations retrieved successfully",
       data: reservations,
@@ -49,8 +50,8 @@ export class ReservationsController {
   }
 
   @Get(":id")
-  async findOne(@Param("id") id: string) {
-    const reservation = await this.reservationsService.findOne(id);
+  async findOne(@Param("id") id: string, @Request() req: any) {
+    const reservation = await this.reservationsService.findOne(id, req.user);
     return { message: "Reservation retrieved successfully", data: reservation };
   }
 
@@ -71,11 +72,7 @@ export class ReservationsController {
     return { message: "Reservation updated successfully", data: reservation };
   }
 
-  @Delete(":id")
-  async remove(@Param("id") id: string, @Request() req: any) {
-    await this.reservationsService.remove(id, req.user.id, req.user.role?.name);
-    return { message: "Reservation deleted successfully" };
-  }
+  // Delete endpoint removed - history deletion is not allowed
 
   @Patch(":id/cancel")
   async cancel(@Param("id") id: string, @Body() dto: any, @Request() req: any) {

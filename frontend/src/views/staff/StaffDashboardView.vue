@@ -618,8 +618,8 @@ const getTabName = (tab: string) => tab === 'RESERVATIONS' ? 'Quản Lý Đặt 
 const getUserInitial = computed(() => authStore.user?.name.charAt(0).toUpperCase() || 'S');
 const todayString = computed(() => new Date().toLocaleDateString('vi-VN'));
 const getCountByStatus = (status: string) => status==='HISTORY' ? reservationStore.reservations.filter(r=>['COMPLETED','CANCELLED', 'NO_SHOW'].includes(r.status)).length : reservationStore.reservations.filter(r=>r.status===status).length;
-const getStatusLabel = (s:string) => ({PENDING:'Chờ duyệt',CONFIRMED:'Sắp đến',OCCUPIED:'Đang có khách',COMPLETED:'Xong',CANCELLED:'Hủy', REQUEST_CANCEL: 'Yêu cầu hủy'}[s]||s);
-const getStatusLabelMap = (s: string) => ({ AVAILABLE: 'Trống', PENDING: 'Chờ duyệt', RESERVED: 'Có khách đặt', OCCUPIED: 'Đang có khách', MAINTENANCE: 'Bảo trì' }[s] || s);
+const getStatusLabel = (s:string) => ({PENDING:'⏳ Chờ duyệt',CONFIRMED:'✅ Sắp đến',OCCUPIED:'🔴 Đang có khách',COMPLETED:'✓ Xong',CANCELLED:'❌ Hủy', REQUEST_CANCEL: '❌ Yêu cầu hủy'}[s]||s);
+const getStatusLabelMap = (s: string) => ({ AVAILABLE: '🟢 Trống', PENDING: '🟡 Chờ duyệt', RESERVED: '🟠 Có khách đặt', OCCUPIED: '🔴 Đang có khách', MAINTENANCE: '⚪ Bảo trì' }[s] || s);
 const formatTimeOnly = (iso: string) => {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });

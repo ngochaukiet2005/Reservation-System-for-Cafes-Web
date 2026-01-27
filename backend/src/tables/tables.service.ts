@@ -319,6 +319,8 @@ export class TablesService {
    * Used for frontend to show correct table status when user selects a different date
    */
   async findAllByDateTime(date: string, time: string): Promise<CafeTable[]> {
+    const MIN_LEAD_MS = 60 * 60 * 1000; // Không cho đặt trong vòng 1 giờ trước slot đầu tiên
+
     const tables = await this.tableRepo.find({
       relations: ["status"],
       order: { sort_order: "ASC", id: "ASC" },
@@ -365,6 +367,7 @@ export class TablesService {
 
       if (dayReservations.length > 0) {
         const earliestTime = dayReservations[0].start_time;
+        const lockStart = new Date(earliestTime.getTime() - MIN_LEAD_MS);
         
         // Kiểm tra xem selected time có trong khoảng reservation nào không
         const inReservationSlot = dayReservations.some(
@@ -380,8 +383,11 @@ export class TablesService {
               r.status?.name === "OCCUPIED"
           );
           newStatusName = occupiedRes ? "OCCUPIED" : "RESERVED";
+        } else if (selectedDateTime >= lockStart && selectedDateTime < earliestTime) {
+          // Trong khoảng khóa 1h trước slot đầu tiên → RESERVED
+          newStatusName = "RESERVED";
         } else if (selectedDateTime >= earliestTime) {
-          // Selected time >= earliest time → Khóa bàn (RESERVED)
+          // >= giờ đầu tiên (vẫn khóa)
           newStatusName = "RESERVED";
         }
         // else: selectedDateTime < earliestTime → Vẫn AVAILABLE
