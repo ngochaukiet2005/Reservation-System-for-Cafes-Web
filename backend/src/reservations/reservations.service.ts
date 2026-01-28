@@ -17,6 +17,10 @@ import {
   ReservationConflictService,
   ReservationStatusService,
 } from "./services";
+import {
+  isOutsideBusinessHours,
+  getBusinessHoursConfig,
+} from "../common/utils/business-hours";
 
 // Thời gian giữ bàn tính từ start_time (ms). Hiện tại: ~1 phút 40 giây.
 const HOLD_WINDOW_MS = 100 * 1000;
@@ -87,7 +91,12 @@ export class ReservationsService {
       .leftJoinAndSelect("r.customer", "customer")
       .where("r.table_id = :tableId", { tableId })
       .andWhere("status.name IN (:...statuses)", {
-        statuses: ["PENDING", "CONFIRMED", "OCCUPIED"],
+        statuses: [
+          "PENDING",
+          "CONFIRMED",
+          "OCCUPIED",
+          "PENDING_OUTSIDE_HOURS",
+        ],
       });
 
     if (date) {
@@ -187,12 +196,16 @@ export class ReservationsService {
       );
     }
 
-    // Lấy status PENDING
-    const pendingStatus = await this.statusRepo.findOne({
-      where: { name: "PENDING" },
-    });
-    if (!pendingStatus) {
-      throw new BadRequestException("PENDING status not found");
+    // Lấy status PENDING và PENDING_OUTSIDE_HOURS
+    const [pendingStatus, pendingOutsideStatus] = await Promise.all([
+      this.statusRepo.findOne({ where: { name: "PENDING" } }),
+      this.statusRepo.findOne({ where: { name: "PENDING_OUTSIDE_HOURS" } }),
+    ]);
+
+    if (!pendingStatus || !pendingOutsideStatus) {
+      throw new BadRequestException(
+        "PENDING or PENDING_OUTSIDE_HOURS status not found",
+      );
     }
 
     const startTime = new Date(dto.reservation_time || dto.start_time);
@@ -224,11 +237,18 @@ export class ReservationsService {
       .getRepository(User)
       .findOne({ where: { id: userId } });
 
+    // Kiểm tra xem đặt bàn có nằm ngoài giờ làm việc không
+    const config = getBusinessHoursConfig();
+    const isOutsideHours = isOutsideBusinessHours(startTime, config);
+    const statusForReservation = isOutsideHours
+      ? pendingOutsideStatus
+      : pendingStatus;
+
     const reservation = this.reservationRepo.create({
       customer_id: userId,
       customer_name: dto.customer_name || customer.user_name,
       customer_phone: dto.customer_phone || customer.phone_number,
-      status_id: pendingStatus.id,
+      status_id: statusForReservation.id,
       start_time: startTime,
       end_time: endTime,
       num_guests: dto.guest_count || dto.num_guests,
@@ -242,7 +262,7 @@ export class ReservationsService {
     const savedReservation = await this.reservationRepo.save(reservation);
 
     this.logger.log(
-      `[CREATE_RESERVATION] Created reservation #${savedReservation.id} for table ${dto.table_id}`,
+      `[CREATE_RESERVATION] Created reservation #${savedReservation.id} for table ${dto.table_id} with status ${statusForReservation.name}${isOutsideHours ? " (outside business hours)" : ""}`,
     );
 
     // Cập nhật table status
