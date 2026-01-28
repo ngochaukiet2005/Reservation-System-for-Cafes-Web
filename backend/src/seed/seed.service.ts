@@ -92,7 +92,7 @@ export class SeedService implements OnModuleInit {
 
   private async ensureReservationStatuses() {
     const statusRepository = this.dataSource.getRepository(ReservationStatus);
-    const statuses = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'OCCUPIED', 'REQUEST_CANCEL', 'EXPIRED'];
+    const statuses = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'OCCUPIED', 'REQUEST_CANCEL', 'EXPIRED', 'PENDING_OUTSIDE_HOURS'];
 
     for (const statusName of statuses) {
       let status = await statusRepository.findOne({ where: { name: statusName } });
