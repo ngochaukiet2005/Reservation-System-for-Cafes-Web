@@ -33,8 +33,6 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue';
-
 // Định nghĩa interface linh hoạt để nhận data từ cả 2 store
 interface TableProps {
   id: number | string;
