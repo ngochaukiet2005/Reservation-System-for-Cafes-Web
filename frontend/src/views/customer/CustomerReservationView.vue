@@ -1,12 +1,37 @@
 <template>
-  <div class="reservation-page">
-    <div
-      v-if="showMinuteDropdown"
-      class="click-overlay"
-      @click="showMinuteDropdown = false"
-    ></div>
+  <div class="customer-dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand" @click="$router.push('/')">
+        <img src="../../assets/logo.png" alt="Logo" class="brand-logo" />
+        <div class="brand-info">
+          <span class="brand-text">Trạm Sạc FC</span>
+          <span class="brand-sub">Customer Portal</span>
+        </div>
+      </div>
+      <ul class="nav-menu">
+        <li class="nav-label">Quản Lý</li>
+        <li class="nav-item active" @click="$router.push('/reservation')">
+          <span class="icon">📅</span> <span class="text">Đặt Bàn</span>
+        </li>
+        <li class="nav-item" @click="$router.push('/history')">
+          <span class="icon">📜</span> <span class="text">Lịch Sử</span>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <p>© 2025 Trạm Sạc FC</p>
+      </div>
+    </aside>
 
-    <div class="main-card">
+    <!-- Main Content -->
+    <div class="customer-main-content">
+      <div
+        v-if="showMinuteDropdown"
+        class="click-overlay"
+        @click="showMinuteDropdown = false"
+      ></div>
+
+      <div class="main-card">
       <div class="header">
         <h2>📅 Đặt Bàn Trực Tuyến</h2>
         <p>Chọn thời gian để xem tình trạng bàn</p>
@@ -227,6 +252,7 @@
         </div>
       </div>
     </transition>
+    </div>
   </div>
 </template>
 
@@ -635,18 +661,143 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Base Styles */
-.reservation-page {
-  padding: 20px;
+/* Customer Dashboard Layout */
+.customer-dashboard-layout {
   display: flex;
-  justify-content: center;
-  padding-bottom: 100px;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+/* Sidebar - Fixed Position */
+.sidebar {
+  width: 260px;
+  background: #1a1a1a;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow-y: auto;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.brand {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.brand:hover {
+  opacity: 0.8;
+}
+
+.brand-logo {
+  height: 32px;
+  margin-right: 12px;
+  filter: brightness(0) invert(1);
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-text {
+  font-weight: 700;
+  color: #a67c52;
+  font-size: 1.1rem;
+}
+
+.brand-sub {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.nav-menu {
+  padding: 20px 15px;
+  flex: 1;
+  list-style: none;
+  margin: 0;
+}
+
+.nav-label {
+  font-size: 0.7rem;
+  color: #666;
+  margin-bottom: 10px;
+  padding-left: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  padding: 12px 15px;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #bbb;
+  display: flex;
+  align-items: center;
+  transition: 0.2s;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, #a67c52 0%, #8e653d 100%);
+  color: #fff;
+}
+
+.nav-item .icon {
+  margin-right: 10px;
+  font-size: 1.2rem;
+}
+
+.nav-item .text {
+  font-weight: 500;
+}
+
+.sidebar-footer {
+  padding: 15px;
+  text-align: center;
+  color: #555;
+  font-size: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Main Content Area */
+.customer-main-content {
+  margin-left: 80px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 5px;
+}
+
+/* Base Styles */
+.customer-main-content {
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
 }
 
 /* FIX: Tăng z-index main-card lên 10 để nằm trên overlay (z-index 5) */
 .main-card {
   background: #fff;
-  padding: 40px;
+  padding: 20px;
   border-radius: 20px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
   width: 100%;
@@ -654,10 +805,12 @@ onUnmounted(() => {
   position: relative;
   z-index: 10;
 }
+
 .header {
   text-align: center;
   margin-bottom: 30px;
 }
+
 .header h2 {
   color: #a67c52;
   font-family: "Cormorant Garamond", serif;
@@ -676,11 +829,13 @@ onUnmounted(() => {
   border: 1px solid #eee;
   align-items: flex-end;
 }
+
 .filter-item {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
+
 .filter-item.action-col {
   justify-content: flex-end;
   flex: 2;
@@ -688,6 +843,7 @@ onUnmounted(() => {
   gap: 10px;
   align-items: flex-end;
 }
+
 .filter-item label {
   font-size: 0.8rem;
   font-weight: 700;

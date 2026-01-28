@@ -1,9 +1,38 @@
 <template>
-  <div class="page-container">
-    
-    <div v-if="showHourDropdown || showMinuteDropdown" class="click-overlay" @click="closeAllDropdowns"></div>
+  <div class="customer-dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand" @click="$router.push('/')">
+        <img src="../../assets/logo.png" alt="Logo" class="brand-logo" />
+        <div class="brand-info">
+          <span class="brand-text">Trạm Sạc FC</span>
+          <span class="brand-sub">Customer Portal</span>
+        </div>
+      </div>
+      <ul class="nav-menu">
+        <li class="nav-label">Quản Lý</li>
+        <li class="nav-item" @click="$router.push('/reservation')">
+          <span class="icon">📅</span> <span class="text">Đặt Bàn</span>
+        </li>
+        <li class="nav-item active" @click="$router.push('/history')">
+          <span class="icon">📜</span> <span class="text">Lịch Sử</span>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <p>© 2025 Trạm Sạc FC</p>
+      </div>
+    </aside>
 
-    <div class="header">
+    <!-- Main Content -->
+    <div class="customer-main-content">
+      <div class="page-container">
+        <div
+          v-if="showHourDropdown || showMinuteDropdown"
+          class="click-overlay"
+          @click="closeAllDropdowns"
+        ></div>
+
+        <div class="header">
       <h2>📜 Lịch Sử Đặt Bàn</h2>
       <button class="btn-create" @click="$router.push('/reservation')">+ Đặt bàn mới</button>
     </div>
@@ -189,7 +218,8 @@
         </div>
       </div>
     </transition>
-
+      </div>
+    </div>
   </div>
 </template>
 
@@ -381,33 +411,228 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.page-container { padding: 30px; max-width: 1000px; margin: 0 auto; font-family: 'Segoe UI', sans-serif; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-.header h2 { margin: 0; color: #2c3e50; font-size: 24px; }
+/* Customer Dashboard Layout */
+.customer-dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+/* Sidebar - Fixed Position */
+.sidebar {
+  width: 260px;
+  background: #1a1a1a;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow-y: auto;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.brand {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.brand:hover {
+  opacity: 0.8;
+}
+
+.brand-logo {
+  height: 32px;
+  margin-right: 12px;
+  filter: brightness(0) invert(1);
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-text {
+  font-weight: 700;
+  color: #a67c52;
+  font-size: 1.1rem;
+}
+
+.brand-sub {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.nav-menu {
+  padding: 20px 15px;
+  flex: 1;
+  list-style: none;
+  margin: 0;
+}
+
+.nav-label {
+  font-size: 0.7rem;
+  color: #666;
+  margin-bottom: 10px;
+  padding-left: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  padding: 12px 15px;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #bbb;
+  display: flex;
+  align-items: center;
+  transition: 0.2s;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, #a67c52 0%, #8e653d 100%);
+  color: #fff;
+}
+
+.nav-item .icon {
+  margin-right: 10px;
+  font-size: 1.2rem;
+}
+
+.nav-item .text {
+  font-weight: 500;
+}
+
+.sidebar-footer {
+  padding: 15px;
+  text-align: center;
+  color: #555;
+  font-size: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Main Content Area */
+.customer-main-content {
+  margin-left: 80px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+}
+
+.page-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  font-family: 'Segoe UI', sans-serif;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 24px;
+}
 
 /* Filter Styles */
 /* Đã sửa align-items thành flex-end để nút xóa lọc nằm dưới cùng */
-.filters-bar { display: flex; gap: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #eee; flex-wrap: wrap; align-items: flex-end; }
-.filter-group { display: flex; flex-direction: column; gap: 5px; }
-.filter-group label { font-size: 0.85rem; font-weight: 600; color: #555; }
-.filter-group select, .filter-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; outline: none; height: 38px; box-sizing: border-box; }
-.time-filter-wrapper { display: flex; align-items: center; gap: 5px; }
-.colon { font-weight: bold; }
+.filters-bar {
+  display: flex;
+  gap: 20px;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #eee;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.filter-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.filter-group select,
+.filter-group input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  outline: none;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.time-filter-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.colon {
+  font-weight: bold;
+}
 
 /* Nút xóa lọc */
-.btn-clear-filter { height: 38px; padding: 0 15px; border: 1px solid #e74c3c; color: #e74c3c; background: transparent; border-radius: 4px; cursor: pointer; font-weight: 600; transition: 0.2s; }
-.btn-clear-filter:hover { background: #e74c3c; color: #fff; }
+.btn-clear-filter {
+  height: 38px;
+  padding: 0 15px;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.btn-clear-filter:hover {
+  background: #e74c3c;
+  color: #fff;
+}
 
 /* --- CUSTOM SELECT CSS (COMMON) --- */
 .custom-select {
-    position: relative;
-    height: 38px;
+  position: relative;
+  height: 38px;
 }
-.custom-select.hour-width { width: 100px; }
-.custom-select.minute-width { width: 70px; }
+
+.custom-select.hour-width {
+  width: 100px;
+}
+
+.custom-select.minute-width {
+  width: 70px;
+}
 
 .cms-trigger {
-    height: 100%;
+  height: 100%;
     background: #fff;
     border: 1px solid #ddd;
     border-radius: 4px;
