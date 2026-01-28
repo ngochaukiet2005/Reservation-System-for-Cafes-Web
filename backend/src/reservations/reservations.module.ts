@@ -11,6 +11,11 @@ import { CafeTable } from "../tables/entities/table.entity";
 import { TableStatus } from "../tables/entities/table-status.entity";
 import { User } from "../users/entities/user.entity";
 import { ReservationsGateway } from "./reservations.gateway";
+import {
+  ReservationValidationService,
+  ReservationConflictService,
+  ReservationStatusService,
+} from "./services";
 
 @Module({
   imports: [
@@ -30,7 +35,14 @@ import { ReservationsGateway } from "./reservations.gateway";
     }),
   ],
   controllers: [ReservationsController],
-  providers: [ReservationsService, ReservationsGateway, ReservationsScheduler],
+  providers: [
+    ReservationsService,
+    ReservationsGateway,
+    ReservationsScheduler,
+    ReservationValidationService,
+    ReservationConflictService,
+    ReservationStatusService,
+  ],
   exports: [ReservationsService],
 })
 export class ReservationsModule {}
