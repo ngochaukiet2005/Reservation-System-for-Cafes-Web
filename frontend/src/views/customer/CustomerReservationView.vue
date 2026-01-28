@@ -151,7 +151,7 @@
       v-if="showForm"
       :isVisible="showForm"
       :selectedTable="selectedTable"
-      :initialData="{ ...filter, time: formatTimeDisplay }"
+      :initialData="{ ...filter, people: selectedTable?.capacity || filter.people, time: formatTimeDisplay }"
       @submit="handleBooking"
       @close="showForm = false"
     />
@@ -165,6 +165,22 @@
           <div class="success-actions">
             <button class="btn-primary" @click="confirmAndGoToHistory">
               Xem lịch sử
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Error Modal -->
+    <transition name="fade">
+      <div v-if="showErrorModal" class="error-overlay" @click.self="showErrorModal = false">
+        <div class="error-box">
+          <div class="error-icon">⚠️</div>
+          <h3>Thông báo</h3>
+          <p>{{ errorMessage }}</p>
+          <div class="error-actions">
+            <button class="btn-primary" @click="showErrorModal = false">
+              OK
             </button>
           </div>
         </div>
@@ -233,6 +249,9 @@ const isSearching = ref(false);
 
 // Modal hiển thị reservations warning
 const showReservationsWarning = ref(false);
+// Modal hiển thị lỗi
+const showErrorModal = ref(false);
+const errorMessage = ref("");
 const selectedTableForWarning = ref<Table | null>(null);
 const tableReservations = ref<any[]>([]);
 const showMinuteDropdown = ref(false);
@@ -490,7 +509,8 @@ const handleBooking = async (formData: any) => {
   try {
     // Validate selectedTable
     if (!selectedTable.value || !selectedTable.value.id) {
-      alert("Vui lòng chọn bàn trước khi đặt chỗ!");
+      errorMessage.value = "Vui lòng chọn bàn trước khi đặt chỗ!";
+      showErrorModal.value = true;
       return;
     }
 
@@ -506,9 +526,13 @@ const handleBooking = async (formData: any) => {
     setTimeout(() => {
       showSuccessModal.value = true;
     }, 300);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error booking:", error);
-    alert("Lỗi kết nối hoặc thông tin không hợp lệ. Vui lòng thử lại.");
+    errorMessage.value =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Lỗi kết nối hoặc thông tin không hợp lệ. Vui lòng thử lại.";
+    showErrorModal.value = true;
   }
 };
 
@@ -989,6 +1013,60 @@ onUnmounted(() => {
 .success-box p {
   color: #666;
   margin-bottom: 30px;
+}
+
+/* Error Modal */
+.error-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.error-box {
+  background: #fff;
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  max-width: 450px;
+  width: 90%;
+  border: 1px solid #eee;
+  animation: popIn 0.4s;
+}
+.error-icon {
+  width: 70px;
+  height: 70px;
+  background: #ff6b6b;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+.error-box h3 {
+  color: #ff6b6b;
+  margin: 0 0 15px;
+  font-size: 22px;
+}
+.error-box p {
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.error-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+.error-actions .btn-primary {
+  min-width: 120px;
 }
 
 /* Reservations Warning Modal */

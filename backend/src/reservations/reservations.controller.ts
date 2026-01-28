@@ -57,7 +57,11 @@ export class ReservationsController {
 
   @Post()
   async create(@Body() dto: any, @Request() req: any) {
-    const reservation = await this.reservationsService.create(dto, req.user.id);
+    const reservation = await this.reservationsService.create(
+      dto,
+      req.user.id,
+      req.user.role?.name,
+    );
     return { message: "Reservation created successfully", data: reservation };
   }
 

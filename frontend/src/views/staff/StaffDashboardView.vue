@@ -128,8 +128,8 @@
                   <td class="id-col">#{{ item.id }}</td>
                   <td>
                     <div class="customer-cell">
-                      <div class="customer-avatar">{{ item.guestName.charAt(0) }}</div>
-                      <div><strong>{{ item.guestName }}</strong><div class="sub-text">{{ item.phone }}</div></div>
+                      <div class="customer-avatar">{{ (item.guestName || "N").charAt(0).toUpperCase() }}</div>
+                      <div><strong>{{ item.guestName || "Chưa cập nhật" }}</strong><div class="sub-text">{{ item.phone || "-" }}</div></div>
                     </div>
                   </td>
                   <td>

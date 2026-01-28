@@ -48,7 +48,7 @@ const mapReservation = (r: any): Reservation => {
     status = r.status.name;
   }
 
-  // Xử lý customer name từ nhiều nguồn
+  // Xử lý customer name từ nhiều nguồn - ưu tiên reservation.customer_name
   const guestName = r.customer_name || r.customer?.name || r.guestName || "N/A";
   const phone = r.customer_phone || r.customer?.phone || r.phone || "N/A";
 

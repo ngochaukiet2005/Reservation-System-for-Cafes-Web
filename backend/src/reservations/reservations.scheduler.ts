@@ -41,9 +41,60 @@ export class ReservationsScheduler {
         return;
       }
 
-      // Tìm CONFIRMED reservation tới giờ mà khách chưa check-in
-      // PENDING không bị expire tự động (chỉ nhân viên hủy thủ công)
       const now = new Date();
+
+      // 1. Tự động hủy các đơn PENDING quá 15 phút chưa được duyệt
+      const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+      const pendingExpired = await this.reservationRepo.find({
+        where: {
+          status_id: pendingStatus.id,
+          created_at: LessThan(fifteenMinutesAgo),
+        },
+        relations: ["table", "customer", "status"],
+      });
+
+      if (pendingExpired.length > 0) {
+        const updatePendingResult = await this.reservationRepo
+          .createQueryBuilder()
+          .update(Reservation)
+          .set({
+            status_id: expiredStatus.id,
+            cancel_reason: "Hệ thống tự động hủy do quá 15 phút chưa được nhân viên duyệt",
+            cancelled_at: now,
+            updated_at: now,
+          })
+          .where("status_id = :statusId", { statusId: pendingStatus.id })
+          .andWhere("created_at < :fifteenMinutesAgo", { fifteenMinutesAgo })
+          .execute();
+
+        if (updatePendingResult.affected && updatePendingResult.affected > 0) {
+          this.logger.log(
+            `[AUTO-CANCEL] Cancelled ${updatePendingResult.affected} PENDING reservation(s) after 15 minutes`,
+          );
+
+          // Emit và cập nhật table status
+          for (const reservation of pendingExpired) {
+            const reloaded = await this.reservationRepo.findOne({
+              where: { id: reservation.id },
+              relations: ["table", "customer", "status"],
+            });
+            if (reloaded) {
+              this.reservationsGateway.emitReservation(
+                "reservation.expired",
+                reloaded,
+              );
+              if (reloaded.table_id) {
+                await this.reservationsService.updateTableStatus(
+                  reloaded.table_id,
+                  "EXPIRED",
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Tìm CONFIRMED reservation tới giờ mà khách chưa check-in
       const expiredReservations = await this.reservationRepo.find({
         where: {
           status_id: confirmedStatus.id,
@@ -74,7 +125,7 @@ export class ReservationsScheduler {
 
       if (updateResult.affected && updateResult.affected > 0) {
         this.logger.log(
-          `[EXPIRE] Expired ${updateResult.affected} PENDING/CONFIRMED reservation(s)`,
+          `[EXPIRE] Expired ${updateResult.affected} CONFIRMED reservation(s)`,
         );
 
         // Reload và emit cho frontend + cập nhật table status

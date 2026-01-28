@@ -14,6 +14,8 @@ import { ReservationsGateway } from "./reservations.gateway";
 
 // Thời gian giữ bàn tính từ start_time (ms). Hiện tại: ~1 phút 40 giây.
 const HOLD_WINDOW_MS = 100 * 1000;
+// Thời gian chờ duyệt tối thiểu cho khách đặt online (ms)
+const CUSTOMER_MIN_LEAD_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class ReservationsService {
@@ -348,7 +350,7 @@ export class ReservationsService {
     this.reservationsGateway.emitTable("table.updated", updatedTable);
   }
 
-  async create(dto: any, userId: string): Promise<Reservation> {
+  async create(dto: any, userId: string, userRole?: string): Promise<Reservation> {
     // Validate table_id
     if (!dto.table_id) {
       throw new BadRequestException(
@@ -366,6 +368,22 @@ export class ReservationsService {
 
     const startTime = new Date(dto.reservation_time || dto.start_time);
     const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 giờ sau
+
+    // Khách hàng đặt online phải chọn thời gian sau hiện tại ít nhất 15 phút
+    const role = (userRole || "").toUpperCase();
+    if (role === "CUSTOMER") {
+      const now = new Date();
+      const minAllowed = new Date(now.getTime() + CUSTOMER_MIN_LEAD_MS);
+      if (startTime.getTime() < minAllowed.getTime()) {
+        const minStr = minAllowed.toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        throw new BadRequestException(
+          "Bạn phải đặt bàn sau thời gian hiện tại 15 phút để nhân viên chúng tôi tiếp nhận đơn này",
+        );
+      }
+    }
 
     // Kiểm tra bàn
     const table = await this.tableRepo.findOne({
@@ -393,6 +411,8 @@ export class ReservationsService {
 
     const reservation = this.reservationRepo.create({
       customer_id: userId,
+      customer_name: dto.customer_name || customer.user_name,
+      customer_phone: dto.customer_phone || customer.phone_number,
       status_id: pendingStatus.id,
       start_time: startTime,
       end_time: endTime,
@@ -441,6 +461,21 @@ export class ReservationsService {
 
     // Chuẩn hóa dữ liệu thời gian và bàn mới (nếu có)
     const newStart = new Date(dto.reservation_time || dto.start_time || reservation.start_time);
+
+    // Khách hàng online không được dời giờ về quá gần hiện tại (>= 15 phút)
+    if (role === "CUSTOMER") {
+      const now = new Date();
+      const minAllowed = new Date(now.getTime() + CUSTOMER_MIN_LEAD_MS);
+      if (newStart.getTime() < minAllowed.getTime()) {
+        const minStr = minAllowed.toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        throw new BadRequestException(
+          "Bạn phải đặt bàn sau thời gian này 15 phút để nhân viên chúng tôi tiếp nhận đơn này",
+        );
+      }
+    }
 
     const targetTableId = dto.table_id || reservation.table_id;
 
