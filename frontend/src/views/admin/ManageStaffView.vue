@@ -18,7 +18,6 @@
               <th width="5%">ID</th>
               <th width="25%">Họ và Tên</th>
               <th width="30%">Email (Tài khoản)</th>
-              <th width="15%">Mật khẩu</th>
               <th width="10%">Số điện thoại</th>
               <th width="8%">Ngày tạo</th>
               <th width="7%">Trạng thái</th>
@@ -27,7 +26,7 @@
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="8" class="loading-cell">
+              <td colspan="7" class="loading-cell">
                 <div class="spinner"></div> Đang tải dữ liệu...
               </td>
             </tr>
@@ -44,11 +43,6 @@
               </td>
               <td>
                 <div class="email-text">{{ staff.email }}</div>
-              </td>
-              <td>
-                <div class="password-cell">
-                  <code class="pwd-chip">{{ staff.plainPassword || '(chưa lưu)' }}</code>
-                </div>
               </td>
               <td>{{ staff.phone }}</td>
               <td class="text-gray">{{ staff.createdAt }}</td>

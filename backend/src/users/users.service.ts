@@ -78,14 +78,10 @@ export class UsersService {
       throw new BadRequestException('Không tìm thấy role STAFF trong database');
     }
 
-    // Hash password
-    const hashedPassword = await this.hashPassword(password);
-
     // Tạo user mới
     const user = this.usersRepository.create({
       email,
-      password: hashedPassword,
-      plain_password: password,
+      password: password,
       user_name: userName,
       phone_number: phoneNumber,
       role_id: staffRole.id,
