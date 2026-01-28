@@ -22,6 +22,12 @@ export class Reservation {
   @Column({ type: 'bigint' })
   customer_id!: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  customer_name?: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  customer_phone?: string;
+
   @ManyToOne(() => ReservationStatus, { nullable: false })
   @JoinColumn({ name: 'status_id' })
   status!: ReservationStatus;

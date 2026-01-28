@@ -106,7 +106,7 @@
           <tr>
             <th>Mã #</th>
             <th>Bàn</th> <th>Thời gian</th>
-            <th>Khách</th>
+            <th>Tên Khách & SĐT</th>
             <th>Trạng thái</th>
             <th class="text-right">Hành động</th>
           </tr>
@@ -128,7 +128,10 @@
               <div>{{ formatDate(res.time) }}</div>
               <div class="time-sub">{{ formatTime(res.time) }}</div>
             </td>
-            <td>{{ res.people }} người</td>
+            <td>
+              <div><strong>{{ res.guestName || "Chưa cập nhật" }}</strong></div>
+              <div class="time-sub">{{ res.phone || "-" }}</div>
+            </td>
             <td>
               <StatusBadge :status="res.status" />
               <div v-if="res.status === 'REQUEST_CANCEL'" class="sub-status warning">
